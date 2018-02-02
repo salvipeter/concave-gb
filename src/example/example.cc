@@ -3,19 +3,23 @@
 #include "cgb.hh"
 
 int main(int argc, char **argv) {
-  if (argc < 4 || argc > 6) {
+  if (argc < 3 || argc > 6) {
     std::cerr << "Usage: " << argv[0]
-              << " input.cgb output.obj resolution [central_weight] [levels]"
+              << " input.cgb output.obj [resolution] [central_weight] [levels]"
               << std::endl;
     return 1;
   }
 
   CGB::ConcaveGB cgb;
 
-  double resolution = std::stod(argv[3]);
-  if (resolution <= 0.0) {
-    std::cerr << "Resolution should be positive." << std::endl;
-    return 1;
+  double resolution = 0.001;
+  
+  if (argc > 3) {
+    resolution = std::stod(argv[3]);
+    if (resolution <= 0.0) {
+      std::cerr << "Resolution should be positive." << std::endl;
+      return 1;
+    }
   }
 
   if (argc > 4) {
@@ -43,6 +47,12 @@ int main(int argc, char **argv) {
     std::cerr << "Cannot open file: " << argv[1] << std::endl;
     return 2;
   }
+
+#ifdef DEBUG
+  std::cout << "Compiled in DEBUG mode" << std::endl;
+#else
+  std::cout << "Compiled in RELEASE mode" << std::endl;
+#endif
 
   cgb.evaluate(resolution).writeOBJ(argv[2]);
 
