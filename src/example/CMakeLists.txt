@@ -1,8 +1,6 @@
 include_directories(${EXTERNAL_INCLUDES} ../cgb)
+link_directories(${EXTERNAL_LIBRARIES})
 
 add_executable(example example.cc)
 
-target_link_libraries(example
-  ${LIBGEOM_LIBRARIES}
-  ${LIBHARMONIC_LIBRARIES}
-  cgb)
+target_link_libraries(example cgb)

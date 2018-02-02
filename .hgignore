@@ -9,4 +9,3 @@ release/*
 *.o
 *.so
 Makefile
-models/*
