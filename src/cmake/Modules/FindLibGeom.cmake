@@ -1,0 +1,5 @@
+if(LIBGEOM_ROOT)
+  set(LIBGEOM_INCLUDE_DIRS "${LIBGEOM_ROOT}/src/geom")
+  set(LIBGEOM_LIBRARIES "${LIBGEOM_ROOT}/release/geom/libgeom.so")
+  set(LIBGEOM_FOUND TRUE)
+endif()

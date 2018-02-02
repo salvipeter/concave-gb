@@ -1,0 +1,12 @@
+syntax: glob
+
+debug/*
+release/*
+*~
+.\#*
+*\#
+*.orig
+*.o
+*.so
+Makefile
+models/*
