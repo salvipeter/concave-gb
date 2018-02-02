@@ -27,9 +27,9 @@ public:
   void generateDomain();
   TriMesh evaluate(double resolution) const;
 private:
-  Point2D localCoordinates(const Point2D &uv, size_t i) const;
-  double weight(const Point2D &uv, size_t i, size_t j, size_t k) const;
-  Point3D evaluate(const Point2D &uv) const;
+  DoubleVector localCoordinates(const Point2D &uv) const;
+  double weight(const DoubleVector &bc, size_t i, size_t j, size_t k) const;
+  Point3D evaluate(const DoubleVector &bc) const;
 
   unsigned int param_levels_;
   CentralWeight central_weight_;
@@ -40,7 +40,8 @@ private:
 
   // Caching
   mutable double last_resolution_;
-  mutable TriMesh domain_mesh_cache_, mesh_cache_;
+  mutable std::vector<DoubleVector> param_cache_;
+  mutable TriMesh mesh_cache_;
 };
 
 }

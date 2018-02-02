@@ -119,7 +119,7 @@ ConcaveGB::generateDomain() {
     harmonic_free(p);
   parameters_.clear();
   last_resolution_ = 0.0;
-  domain_mesh_cache_.clear();
+  param_cache_.clear();
   mesh_cache_.clear();
 
   size_t n = ribbons_.size();
@@ -235,43 +235,52 @@ namespace {
 
 }
 
-Point2D
-ConcaveGB::localCoordinates(const Point2D &uv, size_t i) const {
-  size_t n = parameters_.size(), im = (i + n - 1) % n;
-  auto harmonic = [this, uv, n](size_t j) {
+DoubleVector
+ConcaveGB::localCoordinates(const Point2D &uv) const {
+  size_t n = parameters_.size();
+  DoubleVector result(n, 0.0);
+  for (size_t i = 0; i < n; ++i) {
     double value;
-    if (!harmonic_eval(parameters_[j], const_cast<double *>(uv.data()), &value)) {
+    if (!harmonic_eval(parameters_[i], const_cast<double *>(uv.data()), &value)) {
       // linear interpolation
       size_t k = closest_edge(domain_, uv), km = (k + n - 1) % n;
-      if (j == km)
-        value = (domain_[k] - uv).norm() / (domain_[k] - domain_[km]).norm();
-      else if (j == k)
-        value = (uv - domain_[km]).norm() / (domain_[k] - domain_[km]).norm();
-      else
-        value = 0.0;
+      double x = (uv - domain_[km]).norm() / (domain_[k] - domain_[km]).norm();
+      result[km] = 1 - x;
+      result[k] = x;
+      return result;
     }
-    return value;
-  };
-  double him = harmonic(im), hi = harmonic(i);
-  double d = 1.0 - him - hi;
-  double s = him + hi;
-  if (std::abs(s) > EPSILON)
-    s = hi / s;
-  return Point2D(s, d);
+    result[i] = value;
+  }
+  return result;
+}
+
+namespace {
+
+  Point2D
+  barycentricSD(const DoubleVector &bc, size_t i) {
+    size_t n = bc.size(), im = (i + n - 1) % n;
+    double him = bc[im], hi = bc[i];
+    double d = 1.0 - him - hi;
+    double s = him + hi;
+    if (std::abs(s) > EPSILON)
+      s = hi / s;
+    return Point2D(s, d);
+  }
+
 }
 
 double
-ConcaveGB::weight(const Point2D &uv, size_t i, size_t j, size_t k) const {
+ConcaveGB::weight(const DoubleVector &bc, size_t i, size_t j, size_t k) const {
   // TODO: could be faster if all Bernstein polynomials were computed together
   size_t n = ribbons_.size();
   size_t d = ribbons_[i][0].size() - 1;
   size_t im = (i + n - 1) % n, ip = (i + 1) % n;
-  Point2D sd = localCoordinates(uv, i);
+  Point2D sd = barycentricSD(bc, i);
   double w = bernstein(d, j, sd[0]) * bernstein(d, k, sd[1]);
   double mu = 1.0;
   if (k < 2 && j < 2) {
     // alpha
-    Point2D sdm = localCoordinates(uv, im);
+    Point2D sdm = barycentricSD(bc, im);
     double di2 = std::pow(sd[1], 2), dim2 = std::pow(sdm[1], 2);
     double denom = dim2 + di2;
     if (denom < EPSILON)
@@ -280,7 +289,7 @@ ConcaveGB::weight(const Point2D &uv, size_t i, size_t j, size_t k) const {
       mu = dim2 / denom;
   } else if (k < 2 && j > d - 2) {
     // beta
-    Point2D sdp = localCoordinates(uv, ip);
+    Point2D sdp = barycentricSD(bc, ip);
     double di2 = std::pow(sd[1], 2), dip2 = std::pow(sdp[1], 2);
     double denom = dip2 + di2;
     if (denom < EPSILON)
@@ -294,20 +303,11 @@ ConcaveGB::weight(const Point2D &uv, size_t i, size_t j, size_t k) const {
   return w * mu;
 }
 
-namespace {
-
-  Point2D
-  trimTo2D(const Point3D &p) {
-    return Point2D(p[0], p[1]);
-  }
-
-}
-
 TriMesh
 ConcaveGB::evaluate(double resolution) const {
   if (last_resolution_ != resolution) {
     // Generate a new mesh cache with Shewchuk's Triangle
-    domain_mesh_cache_.clear();
+    param_cache_.clear();
     mesh_cache_.clear();
 
     // Input points
@@ -353,27 +353,25 @@ ConcaveGB::evaluate(double resolution) const {
     triangulate(const_cast<char *>(cmd.str().c_str()), &in, &out, (struct triangulateio *)nullptr);
 
     // Process the result
-    domain_mesh_cache_.resizePoints(out.numberofpoints);
+    param_cache_.reserve(out.numberofpoints);
     for (int i = 0; i < out.numberofpoints; ++i)
-      domain_mesh_cache_[i] = Point3D(out.pointlist[2*i], out.pointlist[2*i+1], 0);
+      param_cache_.emplace_back(localCoordinates(Point2D(out.pointlist[2*i],
+                                                         out.pointlist[2*i+1])));
+    mesh_cache_.resizePoints(param_cache_.size());
     for (int i = 0; i < out.numberoftriangles; ++i)
-      domain_mesh_cache_.addTriangle(out.trianglelist[3*i+0],
-                                     out.trianglelist[3*i+1],
-                                     out.trianglelist[3*i+2]);
-
-    // Setup cache
+      mesh_cache_.addTriangle(out.trianglelist[3*i+0],
+                              out.trianglelist[3*i+1],
+                              out.trianglelist[3*i+2]);
     last_resolution_ = resolution;
-    mesh_cache_.setTriangles(domain_mesh_cache_.triangles());
-    mesh_cache_.resizePoints(domain_mesh_cache_.points().size());
   }
 
-  for (size_t i = 0, ie = domain_mesh_cache_.points().size(); i != ie; ++i)
-    mesh_cache_[i] = evaluate(trimTo2D(domain_mesh_cache_[i]));
+  for (size_t i = 0, ie = param_cache_.size(); i != ie; ++i)
+    mesh_cache_[i] = evaluate(param_cache_[i]);
   return mesh_cache_;
 }
 
 Point3D
-ConcaveGB::evaluate(const Point2D &uv) const {
+ConcaveGB::evaluate(const DoubleVector &bc) const {
   size_t n = ribbons_.size();
   Point3D result(0, 0, 0);
   double weight_sum = 0.0;
@@ -382,7 +380,7 @@ ConcaveGB::evaluate(const Point2D &uv) const {
     size_t d = ribbons_[side][0].size() - 1;
     for (size_t row = 0; row < l; ++row) {
       for (size_t col = 0; col <= d; ++col) {
-        double blend = weight(uv, side, col, row);
+        double blend = weight(bc, side, col, row);
         result += ribbons_[side][row][col] * blend;
         weight_sum += blend;
       }
