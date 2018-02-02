@@ -71,11 +71,12 @@ ConcaveGB::loadControlPoints(const std::string &filename, bool generate_domain) 
   f >> n;
   Point3D p;
   f >> central_cp_[0] >> central_cp_[1] >> central_cp_[2];
+  ribbons_.reserve(n);
   for (size_t side = 0; side < n; ++side) {
     f >> d >> l;
-    Ribbon r;
+    Ribbon r; r.reserve(l);
     for (size_t row = 0; row < l; ++row) {
-      PointVector one_row;
+      PointVector one_row; one_row.reserve(d + 1);
       for (size_t col = 0; col <= d; ++col) {
         f >> p[0] >> p[1] >> p[2];
         one_row.push_back(p);
