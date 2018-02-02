@@ -2,6 +2,7 @@ syntax: glob
 
 debug/*
 release/*
+dependencies/*
 *~
 .\#*
 *\#
@@ -9,3 +10,9 @@ release/*
 *.o
 *.so
 Makefile
+Debug/*
+Release/*
+*.suo
+*.filters
+*.db
+*.opendb
