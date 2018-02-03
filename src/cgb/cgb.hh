@@ -63,9 +63,12 @@ public:
   // Evaluates the surface at a given resolution, resulting in a triangle mesh.
   // If the resolution did not change since the last call,
   // cached parameters and mesh topology are used.
-  // The resolution parameter gives the maximal area of a triangle in the domain.
-  // Since the domain is always in [-1,1]x[-1,1],
-  // usual values range betwen 1e-5 and 1e-3.
+  // If the resolution is positive, it gives the maximal area of a triangle in the domain.
+  // Since the domain is always in [-1,1]x[-1,1], usual values range betwen 1e-5 and 1e-3.
+  // If the resolution is negative, a bitmap-based triangulation is used,
+  // where the resolution means downsampling from the ParamLevels resolution.
+  // So e.g. ParamLevels = 9 (the default) is a 2^9=512x512 bitmap,
+  // with resolution = -2 the triangulation will use a 2^(9-2)=2^7=128x128 bitmap.
   TriMesh evaluate(double resolution) const;
 
 private:

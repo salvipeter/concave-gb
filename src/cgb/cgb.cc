@@ -298,9 +298,12 @@ ConcaveGB::weight(const DoubleVector &bc, size_t i, size_t j, size_t k) const {
 TriMesh
 ConcaveGB::evaluate(double resolution) const {
   if (last_resolution_ != resolution) {
-    ////////////////////////////////////////////////////////
-    // Generate a new mesh cache with Shewchuk's Triangle //
-    ////////////////////////////////////////////////////////
+
+    if (resolution > 0) {
+
+    ////////////////////////////////////////////////////////////////////////////
+    //           Generate a new mesh cache with Shewchuk's Triangle           //
+
     param_cache_.clear();
     mesh_cache_.clear();
 
@@ -356,6 +359,35 @@ ConcaveGB::evaluate(double resolution) const {
       mesh_cache_.addTriangle(out.trianglelist[3*i+0],
                               out.trianglelist[3*i+1],
                               out.trianglelist[3*i+2]);
+
+    //                                                                        //
+    ////////////////////////////////////////////////////////////////////////////
+
+    } else {
+
+    ////////////////////////////////////////////////////////////////////////////
+    //               Generate new mesh by the harmonic bitmap                 //
+
+    unsigned int downsampling = (unsigned int)(-resolution);
+    unsigned int n_vertices = harmonic_mesh_size(parameters_[0], downsampling);
+    DoubleVector vertices(n_vertices * 2);
+    std::vector<unsigned int> triangles(n_vertices * 6);
+    unsigned int n_triangles =
+      harmonic_mesh(parameters_[0], downsampling, &vertices[0], &triangles[0]);
+    param_cache_.clear();
+    param_cache_.reserve(n_vertices);
+    for (unsigned int i = 0; i < n_vertices; ++i)
+      param_cache_.emplace_back(localCoordinates(Point2D(vertices[2*i], vertices[2*i+1])));
+    mesh_cache_.clear();
+    mesh_cache_.resizePoints(n_vertices);
+    for (unsigned int i = 0; i < n_triangles; ++i)
+      mesh_cache_.addTriangle(triangles[3*i+0], triangles[3*i+1], triangles[3*i+2]);
+
+    //                                                                        //
+    ////////////////////////////////////////////////////////////////////////////
+
+    }
+
     last_resolution_ = resolution;
   }
 

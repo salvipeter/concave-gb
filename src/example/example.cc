@@ -14,13 +14,8 @@ int main(int argc, char **argv) {
 
   double resolution = 0.001;
   
-  if (argc > 3) {
+  if (argc > 3)
     resolution = std::stod(argv[3]);
-    if (resolution <= 0.0) {
-      std::cerr << "Resolution should be positive." << std::endl;
-      return 1;
-    }
-  }
 
   if (argc > 4) {
     std::string type(argv[4]);
