@@ -350,7 +350,7 @@ ConcaveGB::evaluate(double resolution) const {
 
     // Call the library function [with maximum triangle area = resolution]
     std::ostringstream cmd;
-    cmd << "pa" << std::fixed << resolution << "qzQ";
+    cmd << "pqa" << std::fixed << resolution << "DBPzQ";
     triangulate(const_cast<char *>(cmd.str().c_str()), &in, &out, (struct triangulateio *)nullptr);
 
     // Process the result
