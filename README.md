@@ -7,6 +7,7 @@ This is a minimal library for evaluating CGB patches.
 The program was tested under Linux and Windows.
 
 You will need the following libraries:
+
 - libgeom, which is part of the [transfinite](https://bitbucket.org/salvipeter/transfinite) library
 - [libharmonic](https://github.com/salvipeter/harmonic)
 - Shewchuk's [Triangle](http://www.cs.cmu.edu/%7Equake/triangle.html)
