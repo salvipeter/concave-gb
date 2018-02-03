@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
-#include <iostream>
 #include <numeric>
 #include <sstream>
 
@@ -213,10 +212,6 @@ namespace {
     return tmp[n];
   }
 
-}
-
-namespace {
-
   size_t closest_edge(const Point2DVector &points, const Point2D &p) {
     size_t n = points.size();
     size_t result = 0;
@@ -232,6 +227,17 @@ namespace {
       }
     }
     return result;
+  }
+
+  Point2D
+  barycentricSD(const DoubleVector &bc, size_t i) {
+    size_t n = bc.size(), im = (i + n - 1) % n;
+    double him = bc[im], hi = bc[i];
+    double d = 1.0 - him - hi;
+    double s = him + hi;
+    if (std::abs(s) > EPSILON)
+      s = hi / s;
+    return Point2D(s, d);
   }
 
 }
@@ -253,21 +259,6 @@ ConcaveGB::localCoordinates(const Point2D &uv) const {
     result[i] = value;
   }
   return result;
-}
-
-namespace {
-
-  Point2D
-  barycentricSD(const DoubleVector &bc, size_t i) {
-    size_t n = bc.size(), im = (i + n - 1) % n;
-    double him = bc[im], hi = bc[i];
-    double d = 1.0 - him - hi;
-    double s = him + hi;
-    if (std::abs(s) > EPSILON)
-      s = hi / s;
-    return Point2D(s, d);
-  }
-
 }
 
 double
@@ -307,7 +298,9 @@ ConcaveGB::weight(const DoubleVector &bc, size_t i, size_t j, size_t k) const {
 TriMesh
 ConcaveGB::evaluate(double resolution) const {
   if (last_resolution_ != resolution) {
-    // Generate a new mesh cache with Shewchuk's Triangle
+    ////////////////////////////////////////////////////////
+    // Generate a new mesh cache with Shewchuk's Triangle //
+    ////////////////////////////////////////////////////////
     param_cache_.clear();
     mesh_cache_.clear();
 
@@ -366,6 +359,7 @@ ConcaveGB::evaluate(double resolution) const {
     last_resolution_ = resolution;
   }
 
+  // Evaluate based on the cached barycentric coordinates
   for (size_t i = 0, ie = param_cache_.size(); i != ie; ++i)
     mesh_cache_[i] = evaluate(param_cache_[i]);
   return mesh_cache_;
@@ -395,8 +389,6 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
   case CentralWeight::ZERO:
     result /= weight_sum;
     break;
-  default:
-    ;
   }
 
   return result;
