@@ -98,6 +98,7 @@ ConcaveGB::loadControlPoints(const std::string &filename, bool generate_domain) 
 
 namespace {
 
+  // Is x in [min, max] ?
   double
   inrange(double min, double x, double max) {
     if (x < min)
@@ -107,8 +108,10 @@ namespace {
     return x;
   }
 
-  DoubleVector
-  normalizeSmallerAngles(DoubleVector angles) {
+  // Normalize angles, but consider concave angles as the negative of the outer (smaller) angles.
+  // This can fail if the sum is close to 0, or if the target is (exactly) 0.
+  bool
+  normalizeSmallerAngles(DoubleVector &angles) {
     auto flip = [](double alpha) { return alpha < 0 ? -(M_PI + alpha) : M_PI - alpha; };
     size_t concave_count = 0;
     double angle_sum = 0.0;
@@ -119,15 +122,18 @@ namespace {
     }
     double target = (angles.size() - 2 - 2 * concave_count) * M_PI;
     if (target == 0 || std::abs(angle_sum) < EPSILON)
-      return DoubleVector();
+      return false;
     double angle_multiplier = target / angle_sum;
     std::transform(angles.begin(), angles.end(), angles.begin(),
                    [flip, angle_multiplier](double x) { return flip(flip(x) * angle_multiplier); });
-    return angles;
+    return true;
   }
 
-  DoubleVector
-  normalizeInnerAngles(DoubleVector angles) {
+  // Normalize angles the old-fashioned way.
+  // This also enlarges concave angles, which is somewhat counter-intuitive,
+  // but we need it as a fallback when normalizeSmallerAngles fails.
+  void
+  normalizeInnerAngles(DoubleVector &angles) {
     auto flip = [](double alpha) { return M_PI - alpha; };
     double angle_sum = 0.0;
     for (const auto &angle : angles)
@@ -136,9 +142,23 @@ namespace {
     double angle_multiplier = target / angle_sum;
     std::transform(angles.begin(), angles.end(), angles.begin(),
                    [flip, angle_multiplier](double x) { return flip(flip(x) * angle_multiplier); });
-    return angles;
   }
 
+  // Rescale to [-1,-1]x[1,1].
+  void
+  rescaleDomain(Point2DVector &domain) {
+    double minx = 0.0, miny = 0.0, maxx = 0.0, maxy = 0.0;
+    for (const auto &v : domain) {
+      minx = std::min(minx, v[0]); miny = std::min(miny, v[1]);
+      maxx = std::max(maxx, v[0]); maxy = std::max(maxy, v[1]);
+    }
+    double width = std::max(maxx - minx, maxy - miny);
+    Point2D topleft(-1.0, -1.0), minp(minx, miny);
+    for (auto &v : domain)
+      v = topleft + (v - minp) * 2.0 / width;
+  }
+
+  // Generates a domain in [-1,1]x[-1,1], but does not check for validity.
   Point2DVector
   generateAngleLengthDomain(const DoubleVector &angles, const DoubleVector &lengths) {
     size_t n = angles.size();
@@ -161,16 +181,7 @@ namespace {
       domain[i] -= domain.back() * accumulated / length_sum;
     }
 
-    // Rescale to [-1,-1]x[1,1]
-    double minx = 0.0, miny = 0.0, maxx = 0.0, maxy = 0.0;
-    for (const auto &v : domain) {
-      minx = std::min(minx, v[0]); miny = std::min(miny, v[1]);
-      maxx = std::max(maxx, v[0]); maxy = std::max(maxy, v[1]);
-    }
-    double width = std::max(maxx - minx, maxy - miny);
-    Point2D topleft(-1.0, -1.0), minp(minx, miny);
-    for (auto &v : domain)
-      v = topleft + (v - minp) * 2.0 / width;
+    rescaleDomain(domain);
 
     return domain;
   }
@@ -183,6 +194,7 @@ namespace {
     auto d = p1 - p2;
     auto normal = [](const Vector2D &v) { return Vector2D(-v[1], v[0]).normalize(); };
     double denom = v2[0] * v1[1] - v2[1] * v1[0];
+
     if (std::abs(denom) < EPSILON) {
       // Parallel
       if (v1 * v2 < 0 && v1 * d >= 0)
@@ -193,27 +205,31 @@ namespace {
         return (d + v1 - v2).norm();
       return std::abs(normal(v1) * d);
     }
+
     // Not parallel
     double t1 = (v2[1] * d[0] - v2[0] * d[1]) / denom;
     double t2 = std::abs(v2[0]) > std::abs(v2[1])
       ? (t1 * v1[0] + d[0]) / v2[0]
       : (t1 * v1[1] + d[1]) / v2[1];
+
     // Check for intersection
     if (0 < t1 && t1 < 1 && 0 < t2 && t2 < 1)
       return 0;
+
     // Try to find an endpoint close to an interval
     double u1 = -(d * v1) / v1.normSqr();          // s2[0]'s parameter when projected on s1
-    double u2 = (d * v2) / v2.normSqr();           // s1[0]'s parameter when projected on s2
-    double w1 = -((d - v2) * v1) / v1.normSqr();   // s2[1]'s parameter when projected on s1
-    double w2 = ((d + v1) * v2) / v2.normSqr();    // s1[1]'s parameter when projected on s2
     if (0 < u1 && u1 < 1 && t2 <= 0)
       return std::abs(normal(v1) * d);
+    double w1 = -((d - v2) * v1) / v1.normSqr();   // s2[1]'s parameter when projected on s1
     if (0 < w1 && w1 < 1 && t2 >= 1)
       return std::abs(normal(v1) * (d - v2));
+    double u2 = (d * v2) / v2.normSqr();           // s1[0]'s parameter when projected on s2
     if (0 < u2 && u2 < 1 && t1 <= 0)
       return std::abs(normal(v2) * d);
+    double w2 = ((d + v1) * v2) / v2.normSqr();    // s1[1]'s parameter when projected on s2
     if (0 < w2 && w2 < 1 && t1 >= 1)
       return std::abs(normal(v2) * (d + v1));
+
     // Find the best endpoint pair
     if (u1 <= 0 && u2 <= 0)
       return d.norm();
@@ -223,10 +239,12 @@ namespace {
       return (d + v1).norm();
     if (w1 >= 1 && w2 >= 1)
       return (d + v1 - v2).norm();
+
     // Should not come here
     return 0;
   }
 
+  // A domain is valid if the smallest distance between non-adjacent segments is above tolerance.
   bool
   isDomainValid(const Point2DVector &domain, double tolerance) {
     size_t n = domain.size();
@@ -244,8 +262,11 @@ namespace {
     return true;
   }
 
-  DoubleVector
-  enlargeDomainAngles(DoubleVector angles) {
+  // Multiplies all convex angles by a factor (1.1 for now),
+  // and distributes the extra amount between the concave vertices uniformly.
+  // If there are no concave angles, it returns false.
+  bool
+  enlargeDomainAngles(DoubleVector &angles) {
     auto flip = [](double alpha) { return M_PI - alpha; };
     size_t concave_count = 0;
     double angle_sum = 0.0;
@@ -254,6 +275,8 @@ namespace {
         ++concave_count;
       angle_sum += flip(angle);
     }
+    if (concave_count == 0)
+      return false;
     double target = (angles.size() - 2) * M_PI;
     double delta = (target - angle_sum) / concave_count;
     std::transform(angles.begin(), angles.end(), angles.begin(),
@@ -262,7 +285,7 @@ namespace {
                        return flip(flip(x) + delta);
                      return flip(flip(x) * 1.1); // kutykurutty
                    });
-    return angles;
+    return true;
   }
 
 }
@@ -301,15 +324,14 @@ ConcaveGB::generateDomain() {
     angles.push_back(alpha);
   }
 
-  auto new_angles = normalizeSmallerAngles(angles);
-  if (new_angles.empty())
-    new_angles = normalizeInnerAngles(angles);
+  if (!normalizeSmallerAngles(angles))
+    normalizeInnerAngles(angles);
 
-  domain_ = generateAngleLengthDomain(new_angles, lengths);
+  domain_ = generateAngleLengthDomain(angles, lengths);
 
-  while(!isDomainValid(domain_, domain_tolerance_)) {
-    new_angles = enlargeDomainAngles(new_angles);
-    domain_ = generateAngleLengthDomain(new_angles, lengths);
+  while (!isDomainValid(domain_, domain_tolerance_)) {
+    enlargeDomainAngles(angles);
+    domain_ = generateAngleLengthDomain(angles, lengths);
   }
 
   // Setup parameterization
@@ -329,6 +351,7 @@ ConcaveGB::generateDomain() {
 
 namespace {
 
+  // B^n_i(u)
   double
   bernstein(size_t n, size_t i, double u) {
     DoubleVector tmp(n + 1, 0.0);
@@ -340,6 +363,9 @@ namespace {
     return tmp[n];
   }
 
+  // Returns the index of the segment closest to p.
+  // An edge is defined by vertices i-1 and i.
+  // (This computes the distances from _lines_, not segments.)
   size_t closestEdge(const Point2DVector &points, const Point2D &p) {
     size_t n = points.size();
     size_t result = 0;
@@ -357,6 +383,7 @@ namespace {
     return result;
   }
 
+  // Returns the (s,d) system for side i, given the barycentric coordinates bc.
   Point2D
   barycentricSD(const DoubleVector &bc, size_t i) {
     size_t n = bc.size(), im = (i + n - 1) % n;
@@ -370,6 +397,7 @@ namespace {
 
 }
 
+// Returns the barycentric coordinates for an (u,v) point in the domain.
 DoubleVector
 ConcaveGB::localCoordinates(const Point2D &uv) const {
   size_t n = parameters_.size();
@@ -389,6 +417,7 @@ ConcaveGB::localCoordinates(const Point2D &uv) const {
   return result;
 }
 
+// Returns C^i_{j,k}, given the barycentric coordinates bc (side i, row k, column j).
 double
 ConcaveGB::weight(const DoubleVector &bc, size_t i, size_t j, size_t k) const {
   // TODO: could be faster if all Bernstein polynomials were computed together
@@ -525,6 +554,7 @@ ConcaveGB::evaluate(double resolution) const {
   return mesh_cache_;
 }
 
+// Returns a surface point given the barycentric coordinates bc.
 Point3D
 ConcaveGB::evaluate(const DoubleVector &bc) const {
   size_t n = ribbons_.size();
