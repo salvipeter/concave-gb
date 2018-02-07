@@ -29,6 +29,10 @@ public:
   // ZERO: zero, using normalization of the weights
   void setCentralWeight(CentralWeight type);
 
+  // The given tolerance controls the minimum distance between non-adjacent segments.
+  // Note that the domain is always normalized to the [-1,1]x[-1,1] square.
+  void setDomainTolerance(double tolerance);
+
   // Sets the central control point position.
   void setCentralControlPoint(const Point3D &p);
 
@@ -78,6 +82,7 @@ private:
 
   unsigned int param_levels_;
   CentralWeight central_weight_;
+  double domain_tolerance_;
   Point3D central_cp_;
   Point2DVector domain_;
   std::vector<HarmonicMap *> parameters_;
