@@ -124,8 +124,8 @@ namespace {
     if (target == 0 || std::abs(angle_sum) < EPSILON)
       return false;
     double angle_multiplier = target / angle_sum;
-    std::transform(angles.begin(), angles.end(), angles.begin(),
-                   [flip, angle_multiplier](double x) { return flip(flip(x) * angle_multiplier); });
+    for (auto &angle : angles)
+      angle = flip(flip(angle) * angle_multiplier);
     return true;
   }
 
@@ -140,8 +140,8 @@ namespace {
       angle_sum += flip(angle);
     double target = (angles.size() - 2) * M_PI;
     double angle_multiplier = target / angle_sum;
-    std::transform(angles.begin(), angles.end(), angles.begin(),
-                   [flip, angle_multiplier](double x) { return flip(flip(x) * angle_multiplier); });
+    for (auto &angle : angles)
+      angle = flip(flip(angle) * angle_multiplier);
   }
 
   // Rescale to [-1,-1]x[1,1].
@@ -281,12 +281,8 @@ namespace {
       return false;
     double target = (angles.size() - 2) * M_PI;
     double delta = (target - angle_sum) / concave_count;
-    std::transform(angles.begin(), angles.end(), angles.begin(),
-                   [flip, delta](double x) {
-                     if (x < 0)
-                       return flip(flip(x) + delta);
-                     return flip(flip(x) * 1.1); // kutykurutty
-                   });
+    for (auto &angle : angles)
+      angle = angle < 0 ? flip(flip(angle) + delta) : flip(flip(angle) * 1.1);
     return true;
   }
 
