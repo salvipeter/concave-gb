@@ -98,7 +98,7 @@ ConcaveGB::loadControlPoints(const std::string &filename, bool generate_domain) 
 
 namespace {
 
-  // Is x in [min, max] ?
+  // Forces x into [min, max].
   double
   inrange(double min, double x, double max) {
     if (x < min)
