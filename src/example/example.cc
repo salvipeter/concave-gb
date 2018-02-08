@@ -28,7 +28,8 @@ int main(int argc, char **argv) {
     else if (type == "harmonic")
       cgb.setCentralWeight(CGB::ConcaveGB::CentralWeight::HARMONIC);
     else {
-      std::cerr << "Possible values for central_weight: original / zero / harmonic ." << std::endl;
+      std::cerr << "Possible values for central_weight: original / zero / nth / harmonic ."
+                << std::endl;
       return 1;
     }
   }
