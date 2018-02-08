@@ -202,6 +202,8 @@ namespace {
       if (v1 * v2 > 0 && v1 * (d + v1) <= 0)
         return (d + v1).norm();
       if (v1 * v2 > 0 && v1 * (d - v2) >= 0)
+        return (d - v2).norm();
+      if (v1 * v2 < 0 && v1 * (d + v1 - v2) <= 0)
         return (d + v1 - v2).norm();
       return std::abs(normal(v1) * d);
     }
