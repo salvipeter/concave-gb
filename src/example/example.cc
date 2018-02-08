@@ -23,8 +23,12 @@ int main(int argc, char **argv) {
       cgb.setCentralWeight(CGB::ConcaveGB::CentralWeight::ORIGINAL);
     else if (type == "zero")
       cgb.setCentralWeight(CGB::ConcaveGB::CentralWeight::ZERO);
+    else if (type == "nth")
+      cgb.setCentralWeight(CGB::ConcaveGB::CentralWeight::NTH);
+    else if (type == "harmonic")
+      cgb.setCentralWeight(CGB::ConcaveGB::CentralWeight::HARMONIC);
     else {
-      std::cerr << "Possible values for central_weight: original / zero ." << std::endl;
+      std::cerr << "Possible values for central_weight: original / zero / harmonic ." << std::endl;
       return 1;
     }
   }

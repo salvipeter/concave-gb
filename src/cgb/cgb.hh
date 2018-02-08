@@ -13,7 +13,7 @@ using namespace Geometry;
 
 class ConcaveGB {
 public:
-  enum class CentralWeight { ORIGINAL, ZERO };
+  enum class CentralWeight { ORIGINAL, ZERO, NTH, HARMONIC };
   using Ribbon = std::vector<PointVector>; // (degree + 1) * layer
 
   ConcaveGB();
@@ -27,6 +27,8 @@ public:
   // Sets the type of central weight computation.
   // ORIGINAL: the total weight deficiency (as described in the original paper)
   // ZERO: zero, using normalization of the weights
+  // NTH: 1/n-th of the total weight deficiency (and all weights are normalized)
+  // HARMONIC: computed from harmonic coordinates (and all weights are normalized)
   void setCentralWeight(CentralWeight type);
 
   // The given tolerance controls the minimum distance between non-adjacent segments.

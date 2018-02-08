@@ -570,14 +570,25 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
     }
   }
 
+  double central_blend = 0.0;
   switch (central_weight_) {
   case CentralWeight::ORIGINAL:
-    result += central_cp_ * (1.0 - weight_sum);
+    central_blend = 1.0 - weight_sum;
     break;
   case CentralWeight::ZERO:
-    result /= weight_sum;
+    break;
+  case CentralWeight::NTH:
+    central_blend = (1.0 - weight_sum) / (double)n;
+    break;
+  case CentralWeight::HARMONIC:
+    central_blend = n;
+    for (size_t i = 0; i < n; ++i)
+      central_blend *= std::pow(barycentricSD(bc, i)[1], 2);
     break;
   }
+
+  result += central_cp_ * central_blend;
+  result /= weight_sum + central_blend;
 
   return result;
 }
