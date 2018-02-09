@@ -366,9 +366,9 @@ ConcaveGB::generateDomain() {
 namespace {
 
   // B^n_i(u) for all i = 0..n
-  DoubleVector
-  bernstein(size_t n, double u) {
-    DoubleVector coeff; coeff.reserve(n + 1);
+  void
+  bernstein(size_t n, double u, DoubleVector &coeff) {
+    coeff.clear(); coeff.reserve(n + 1);
     coeff.push_back(1.0);
     double u1 = 1.0 - u;
     for (size_t j = 1; j <= n; ++j) {
@@ -380,7 +380,6 @@ namespace {
       }
       coeff.push_back(saved);
     }
-    return coeff;
   }
 
   // Returns the index of the segment closest to p.
@@ -574,12 +573,13 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
   for (size_t i = 0; i < n; ++i)
     sds.push_back(barycentricSD(bc, i, parameter_dilation_));
 
+  DoubleVector bl_s, bl_d;
   double weight_sum = 0.0;
   for (size_t side = 0; side < n; ++side) {
     size_t l = ribbons_[side].size();
     size_t d = ribbons_[side][0].size() - 1;
-    DoubleVector bl_s = bernstein(d, sds[side][0]);
-    DoubleVector bl_d = bernstein(d, sds[side][1]);
+    bernstein(d, sds[side][0], bl_s);
+    bernstein(d, sds[side][1], bl_d);
     for (size_t row = 0; row < l; ++row) {
       for (size_t col = 0; col <= d; ++col) {
         double blend = bl_s[col] * bl_d[row] * weight(d, sds, side, col, row);
