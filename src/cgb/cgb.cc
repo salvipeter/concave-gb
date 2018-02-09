@@ -35,7 +35,7 @@ ConcaveGB::~ConcaveGB() {
 
 
 void
-ConcaveGB::setParamLevels(unsigned int levels) {
+ConcaveGB::setParamLevels(size_t levels) {
   param_levels_ = levels;
 }
 
@@ -532,19 +532,18 @@ ConcaveGB::generateDelaunayMesh(double resolution) const {
 
 // Generates a new mesh cache using the harmonic library.
 void
-ConcaveGB::generateRegularMesh(unsigned int downsampling) const {
-  unsigned int n_vertices = harmonic_mesh_size(parameters_[0], downsampling);
+ConcaveGB::generateRegularMesh(size_t downsampling) const {
+  size_t n_vertices = harmonic_mesh_size(parameters_[0], downsampling);
   DoubleVector vertices(n_vertices * 2);
-  std::vector<unsigned int> triangles(n_vertices * 6);
-  unsigned int n_triangles =
-    harmonic_mesh(parameters_[0], downsampling, &vertices[0], &triangles[0]);
+  std::vector<size_t> triangles(n_vertices * 6);
+  size_t n_triangles = harmonic_mesh(parameters_[0], downsampling, &vertices[0], &triangles[0]);
   param_cache_.clear();
   param_cache_.reserve(n_vertices);
-  for (unsigned int i = 0; i < n_vertices; ++i)
+  for (size_t i = 0; i < n_vertices; ++i)
     param_cache_.emplace_back(localCoordinates(Point2D(vertices[2*i], vertices[2*i+1])));
   mesh_cache_.clear();
   mesh_cache_.resizePoints(n_vertices);
-  for (unsigned int i = 0; i < n_triangles; ++i)
+  for (size_t i = 0; i < n_triangles; ++i)
     mesh_cache_.addTriangle(triangles[3*i+0], triangles[3*i+1], triangles[3*i+2]);
 }
 
@@ -554,7 +553,7 @@ ConcaveGB::evaluate(double resolution) const {
     if (resolution > 0)
       generateDelaunayMesh(resolution);
     else
-      generateRegularMesh((unsigned int)-resolution);
+      generateRegularMesh((size_t)-resolution);
     last_resolution_ = resolution;
   }
 

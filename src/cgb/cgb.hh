@@ -22,7 +22,7 @@ public:
   // Level of detail for the discrete approximation of harmonic coordinates.
   // The program uses a set of n bitmaps, each of dimension 2^levels x 2^levels.
   // Usual values are between 9 and 11.
-  void setParamLevels(unsigned int levels);
+  void setParamLevels(size_t levels);
 
   // Sets the type of central weight computation.
   // ORIGINAL: the total weight deficiency (as described in the original paper)
@@ -88,11 +88,11 @@ public:
 
 private:
   void generateDelaunayMesh(double resolution) const;
-  void generateRegularMesh(unsigned int downsampling) const;
+  void generateRegularMesh(size_t downsampling) const;
   DoubleVector localCoordinates(const Point2D &uv) const;
   Point3D evaluate(const DoubleVector &bc) const;
 
-  unsigned int param_levels_;
+  size_t param_levels_;
   CentralWeight central_weight_;
   double domain_tolerance_;
   double parameter_dilation_;
