@@ -13,7 +13,7 @@ using namespace Geometry;
 
 class ConcaveGB {
 public:
-  enum class CentralWeight { ORIGINAL, ZERO, NTH, HARMONIC };
+  enum class CentralWeight { ORIGINAL = 0, ZERO = 1, NTH = 2, HARMONIC = 3 };
   using Ribbon = std::vector<PointVector>; // (degree + 1) * layer
 
   ConcaveGB();
@@ -35,6 +35,9 @@ public:
   // Note that the domain is always normalized to the [-1,1]x[-1,1] square.
   void setDomainTolerance(double tolerance);
 
+  // Alternative parameterization - positive values result in smaller weight deficiency.
+  void setParameterDilation(double dilation);
+
   // Sets the central control point position.
   void setCentralControlPoint(const Point3D &p);
 
@@ -42,6 +45,12 @@ public:
   // If generate_domain is set to false, the program assumes that the domain can stay the same.
   // A Ribbon consists of rows of control points, each row contains degree + 1 control points.
   bool setRibbons(const std::vector<Ribbon> &ribbons, bool generate_domain = true);
+
+  // Reads model-specific options. The file format is the following:
+  //   central_weight (as an integer)
+  //   domain_tolerance
+  //   parameter_dilation
+  bool loadOptions(std::istream &is);
 
   // Sets the ribbons and the central control point.
   // If generate_domain is set to false, the program assumes that the domain can stay the same.
@@ -60,7 +69,7 @@ public:
   // Points are stored row by row, so
   //   (1,0,1)->...->(1,d1,1)->(1,0,2)->...->(1,d1,l1)->(2,0,1)->...->(n,dn,ln)
   // Here i and k is indexed from 1, while j is indexed from 0, for convenience.
-  bool loadControlPoints(const std::string &filename, bool generate_domain = true);
+  bool loadControlPoints(std::istream &is, bool generate_domain = true);
 
   // Regenerates the domain and updates the harmonic maps.
   // Assumes that the ribbons are set.
@@ -78,6 +87,7 @@ public:
   TriMesh evaluate(double resolution) const;
 
 private:
+  Point2D barycentricSD(const DoubleVector &bc, size_t i) const;
   DoubleVector localCoordinates(const Point2D &uv) const;
   double weight(const DoubleVector &bc, size_t i, size_t j, size_t k) const;
   Point3D evaluate(const DoubleVector &bc) const;
@@ -85,6 +95,7 @@ private:
   unsigned int param_levels_;
   CentralWeight central_weight_;
   double domain_tolerance_;
+  double parameter_dilation_;
   Point3D central_cp_;
   Point2DVector domain_;
   std::vector<HarmonicMap *> parameters_;

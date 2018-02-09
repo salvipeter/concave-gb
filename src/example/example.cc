@@ -1,3 +1,4 @@
+#include <fstream>
 #include <iostream>
 
 #include "cgb.hh"
@@ -5,7 +6,7 @@
 int main(int argc, char **argv) {
   if (argc < 3 || argc > 6) {
     std::cerr << "Usage: " << argv[0]
-              << " input.cgb output.obj [resolution] [central_weight] [levels]"
+              << " input.cgb output.obj [resolution] [levels]"
               << std::endl;
     return 1;
   }
@@ -18,24 +19,7 @@ int main(int argc, char **argv) {
     resolution = std::stod(argv[3]);
 
   if (argc > 4) {
-    std::string type(argv[4]);
-    if (type == "original")
-      cgb.setCentralWeight(CGB::ConcaveGB::CentralWeight::ORIGINAL);
-    else if (type == "zero")
-      cgb.setCentralWeight(CGB::ConcaveGB::CentralWeight::ZERO);
-    else if (type == "nth")
-      cgb.setCentralWeight(CGB::ConcaveGB::CentralWeight::NTH);
-    else if (type == "harmonic")
-      cgb.setCentralWeight(CGB::ConcaveGB::CentralWeight::HARMONIC);
-    else {
-      std::cerr << "Possible values for central_weight: original / zero / nth / harmonic ."
-                << std::endl;
-      return 1;
-    }
-  }
-
-  if (argc > 5) {
-    unsigned int levels = std::stoi(argv[5]);
+    unsigned int levels = std::stoi(argv[4]);
     if (levels <= 0) {
       std::cerr << "Parameterization level should be positive." << std::endl;
       return 1;
@@ -43,9 +27,12 @@ int main(int argc, char **argv) {
     cgb.setParamLevels(levels);
   }
 
-  if (!cgb.loadControlPoints(argv[1])) {
-    std::cerr << "Cannot open file: " << argv[1] << std::endl;
-    return 2;
+  {
+    std::ifstream f(argv[1]);
+    if (!f.is_open() || !cgb.loadOptions(f) || !cgb.loadControlPoints(f)) {
+      std::cerr << "Cannot open file: " << argv[1] << std::endl;
+      return 2;
+    }
   }
 
 #ifdef DEBUG

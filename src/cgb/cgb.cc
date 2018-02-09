@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <cmath>
-#include <fstream>
 #include <numeric>
 #include <sstream>
 
@@ -25,7 +24,7 @@ namespace CGB {
 
 ConcaveGB::ConcaveGB() :
   param_levels_(9), central_weight_(CentralWeight::ZERO), domain_tolerance_(0.2),
-  central_cp_(0, 0, 0), last_resolution_(0.0)
+  parameter_dilation_(0.0), central_cp_(0, 0, 0), last_resolution_(0.0)
 {
 }
 
@@ -51,6 +50,11 @@ ConcaveGB::setDomainTolerance(double tolerance) {
 }
 
 void
+ConcaveGB::setParameterDilation(double dilation) {
+  parameter_dilation_ = dilation;
+}
+
+void
 ConcaveGB::setCentralControlPoint(const Point3D &p) {
   central_cp_ = p;
 }
@@ -66,23 +70,35 @@ ConcaveGB::setRibbons(const std::vector<Ribbon> &ribbons, bool generate_domain) 
 }
 
 bool
-ConcaveGB::loadControlPoints(const std::string &filename, bool generate_domain) {
+ConcaveGB::loadOptions(std::istream &is) {
+  unsigned int cw;
+  is >> cw >> domain_tolerance_ >> parameter_dilation_;
+
+  if (cw > 3 || domain_tolerance_ < 0 || parameter_dilation_ < 0)
+    return false;
+
+  central_weight_ = static_cast<CentralWeight>(cw);
+
+  return is.good();
+}
+
+bool
+ConcaveGB::loadControlPoints(std::istream &is, bool generate_domain) {
   ribbons_.clear();
 
   size_t n, d, l;
 
-  std::ifstream f(filename);
-  f >> n;
+  is >> n;
   Point3D p;
-  f >> central_cp_[0] >> central_cp_[1] >> central_cp_[2];
+  is >> central_cp_[0] >> central_cp_[1] >> central_cp_[2];
   ribbons_.reserve(n);
   for (size_t side = 0; side < n; ++side) {
-    f >> d >> l;
+    is >> d >> l;
     Ribbon r; r.reserve(l);
     for (size_t row = 0; row < l; ++row) {
       PointVector one_row; one_row.reserve(d + 1);
       for (size_t col = 0; col <= d; ++col) {
-        f >> p[0] >> p[1] >> p[2];
+        is >> p[0] >> p[1] >> p[2];
         one_row.push_back(p);
       }
       r.push_back(std::move(one_row));
@@ -90,10 +106,10 @@ ConcaveGB::loadControlPoints(const std::string &filename, bool generate_domain) 
     ribbons_.push_back(std::move(r));
   }
   
-  if (generate_domain && f.good())
+  if (generate_domain && is.good())
     generateDomain();
 
-  return f.good();
+  return is.good();
 }
 
 namespace {
@@ -381,18 +397,20 @@ namespace {
     return result;
   }
 
-  // Returns the (s,d) system for side i, given the barycentric coordinates bc.
-  Point2D
-  barycentricSD(const DoubleVector &bc, size_t i) {
-    size_t n = bc.size(), im = (i + n - 1) % n;
-    double him = bc[im], hi = bc[i];
-    double d = 1.0 - him - hi;
-    double s = him + hi;
-    if (std::abs(s) > EPSILON)
-      s = hi / s;
-    return Point2D(s, d);
-  }
+}
 
+// Returns the (s,d) system for side i, given the barycentric coordinates bc.
+Point2D
+ConcaveGB::barycentricSD(const DoubleVector &bc, size_t i) const {
+  size_t n = bc.size(), im = (i + n - 1) % n;
+  size_t imm = (i + n - 2) % n, ip = (i + 1) % n;
+  double him = bc[im], hi = bc[i];
+  double himm = bc[imm], hip = bc[ip];
+  double d = (1.0 - him - hi) * (1.0 - parameter_dilation_ * himm * hip);
+  double s = him + hi;
+  if (std::abs(s) > EPSILON)
+    s = hi / s;
+  return Point2D(s, d);
 }
 
 // Returns the barycentric coordinates for an (u,v) point in the domain.
