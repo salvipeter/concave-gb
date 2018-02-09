@@ -24,7 +24,7 @@ namespace CGB {
 
 ConcaveGB::ConcaveGB() :
   param_levels_(9), central_weight_(CentralWeight::ZERO), domain_tolerance_(0.2),
-  parameter_dilation_(0.0), central_cp_(0, 0, 0), last_resolution_(0.0)
+  parameter_dilation_(0.0), central_cp_(0, 0, 0), last_resolution_(std::nan(""))
 {
 }
 
@@ -311,7 +311,7 @@ ConcaveGB::generateDomain() {
   for (auto p : parameters_)
     harmonic_free(p);
   parameters_.clear();
-  last_resolution_ = 0.0;
+  last_resolution_ = std::nan("");
   param_cache_.clear();
   mesh_cache_.clear();
 
