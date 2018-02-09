@@ -87,9 +87,9 @@ public:
   TriMesh evaluate(double resolution) const;
 
 private:
-  Point2D barycentricSD(const DoubleVector &bc, size_t i) const;
+  void generateDelaunayMesh(double resolution) const;
+  void generateRegularMesh(unsigned int downsampling) const;
   DoubleVector localCoordinates(const Point2D &uv) const;
-  double weight(const DoubleVector &bc, size_t i, size_t j, size_t k) const;
   Point3D evaluate(const DoubleVector &bc) const;
 
   unsigned int param_levels_;

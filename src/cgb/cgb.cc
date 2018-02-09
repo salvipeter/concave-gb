@@ -380,7 +380,8 @@ namespace {
   // Returns the index of the segment closest to p.
   // An edge is defined by vertices i-1 and i.
   // (This computes the distances from _lines_, not segments.)
-  size_t closestEdge(const Point2DVector &points, const Point2D &p) {
+  size_t
+  closestEdge(const Point2DVector &points, const Point2D &p) {
     size_t n = points.size();
     size_t result = 0;
     double min = -1;
@@ -397,20 +398,54 @@ namespace {
     return result;
   }
 
-}
+  // Returns the (s,d) system for side i, given the barycentric coordinates bc.
+  Point2D
+  barycentricSD(const DoubleVector &bc, size_t i, double dilation) {
+    size_t n = bc.size(), im = (i + n - 1) % n;
+    size_t imm = (i + n - 2) % n, ip = (i + 1) % n;
+    double him = bc[im], hi = bc[i];
+    double himm = bc[imm], hip = bc[ip];
+    double d = (1.0 - him - hi) * (1.0 - dilation * himm * hip);
+    double s = him + hi;
+    if (std::abs(s) > EPSILON)
+      s = hi / s;
+    return Point2D(s, d);
+  }
 
-// Returns the (s,d) system for side i, given the barycentric coordinates bc.
-Point2D
-ConcaveGB::barycentricSD(const DoubleVector &bc, size_t i) const {
-  size_t n = bc.size(), im = (i + n - 1) % n;
-  size_t imm = (i + n - 2) % n, ip = (i + 1) % n;
-  double him = bc[im], hi = bc[i];
-  double himm = bc[imm], hip = bc[ip];
-  double d = (1.0 - him - hi) * (1.0 - parameter_dilation_ * himm * hip);
-  double s = him + hi;
-  if (std::abs(s) > EPSILON)
-    s = hi / s;
-  return Point2D(s, d);
+  // Returns C^i_{j,k}, given the local coordinates sds (side i, row k, column j).
+  double
+  weight(size_t d, const Point2DVector &sds, size_t i, size_t j, size_t k) {
+    size_t n = sds.size();
+    const Point2D &sd = sds[i];
+    double w = bernstein(d, j, sd[0]) * bernstein(d, k, sd[1]);
+    double mu = 1.0;
+    if (k < 2 && j < 2) {
+      // alpha
+      size_t im = (i + n - 1) % n;
+      const Point2D &sdm = sds[im];
+      double di2 = std::pow(sd[1], 2), dim2 = std::pow(sdm[1], 2);
+      double denom = dim2 + di2;
+      if (denom < EPSILON)
+        mu = 0.5;
+      else
+        mu = dim2 / denom;
+    } else if (k < 2 && j > d - 2) {
+      // beta
+      size_t ip = (i + 1) % n;
+      const Point2D &sdp = sds[ip];
+      double di2 = std::pow(sd[1], 2), dip2 = std::pow(sdp[1], 2);
+      double denom = dip2 + di2;
+      if (denom < EPSILON)
+        mu = 0.5;
+      else
+        mu = dip2 / denom;
+    } else if (j < k || j > d - k)
+      mu = 0.0;
+    else if (j == k || j == d - k)
+      mu = 0.5;
+    return w * mu;
+  }
+
 }
 
 // Returns the barycentric coordinates for an (u,v) point in the domain.
@@ -433,134 +468,91 @@ ConcaveGB::localCoordinates(const Point2D &uv) const {
   return result;
 }
 
-// Returns C^i_{j,k}, given the barycentric coordinates bc (side i, row k, column j).
-double
-ConcaveGB::weight(const DoubleVector &bc, size_t i, size_t j, size_t k) const {
-  // TODO: could be faster if all Bernstein polynomials were computed together
-  size_t n = ribbons_.size();
-  size_t d = ribbons_[i][0].size() - 1;
-  size_t im = (i + n - 1) % n, ip = (i + 1) % n;
-  Point2D sd = barycentricSD(bc, i);
-  double w = bernstein(d, j, sd[0]) * bernstein(d, k, sd[1]);
-  double mu = 1.0;
-  if (k < 2 && j < 2) {
-    // alpha
-    Point2D sdm = barycentricSD(bc, im);
-    double di2 = std::pow(sd[1], 2), dim2 = std::pow(sdm[1], 2);
-    double denom = dim2 + di2;
-    if (denom < EPSILON)
-      mu = 0.5;
-    else
-      mu = dim2 / denom;
-  } else if (k < 2 && j > d - 2) {
-    // beta
-    Point2D sdp = barycentricSD(bc, ip);
-    double di2 = std::pow(sd[1], 2), dip2 = std::pow(sdp[1], 2);
-    double denom = dip2 + di2;
-    if (denom < EPSILON)
-      mu = 0.5;
-    else
-      mu = dip2 / denom;
-  } else if (j < k || j > d - k)
-    mu = 0.0;
-  else if (j == k || j == d - k)
-    mu = 0.5;
-  return w * mu;
+// Generates a new mesh cache using Shewchuk's Triangle library.
+void
+ConcaveGB::generateDelaunayMesh(double resolution) const {
+  param_cache_.clear();
+  mesh_cache_.clear();
+
+  // Input points
+  size_t n = domain_.size();
+  DoubleVector points; points.reserve(2 * n);
+  for (const auto &p : domain_) {
+    points.push_back(p[0]);
+    points.push_back(p[1]);
+  }
+
+  // Input segments : just a closed polygon
+  std::vector<int> segments; segments.reserve(2 * n);
+  for (size_t i = 0; i < n; ++i) {
+    segments[2*i]   = i;
+    segments[2*i+1] = i + 1;
+  }
+  segments[2*n-1] = 0;
+    
+  // Setup output data structure
+  struct triangulateio in, out;
+  in.pointlist = &points[0];
+  in.numberofpoints = n;
+  in.numberofpointattributes = 0;
+  in.pointmarkerlist = nullptr;
+  in.segmentlist = &segments[0];
+  in.numberofsegments = n;
+  in.segmentmarkerlist = nullptr;
+  in.numberofholes = 0;
+  in.numberofregions = 0;
+
+  // Setup output data structure
+  out.pointlist = nullptr;
+  out.pointattributelist = nullptr;
+  out.pointmarkerlist = nullptr;
+  out.trianglelist = nullptr;
+  out.triangleattributelist = nullptr;
+  out.segmentlist = nullptr;
+  out.segmentmarkerlist = nullptr;
+
+  // Call the library function [with maximum triangle area = resolution]
+  std::ostringstream cmd;
+  cmd << "pqa" << std::fixed << resolution << "DBPzQ";
+  triangulate(const_cast<char *>(cmd.str().c_str()), &in, &out, (struct triangulateio *)nullptr);
+
+  // Process the result
+  param_cache_.reserve(out.numberofpoints);
+  for (int i = 0; i < out.numberofpoints; ++i)
+    param_cache_.emplace_back(localCoordinates(Point2D(out.pointlist[2*i],
+                                                       out.pointlist[2*i+1])));
+  mesh_cache_.resizePoints(param_cache_.size());
+  for (int i = 0; i < out.numberoftriangles; ++i)
+    mesh_cache_.addTriangle(out.trianglelist[3*i+0],
+                            out.trianglelist[3*i+1],
+                            out.trianglelist[3*i+2]);
+}
+
+// Generates a new mesh cache using the harmonic library.
+void
+ConcaveGB::generateRegularMesh(unsigned int downsampling) const {
+  unsigned int n_vertices = harmonic_mesh_size(parameters_[0], downsampling);
+  DoubleVector vertices(n_vertices * 2);
+  std::vector<unsigned int> triangles(n_vertices * 6);
+  unsigned int n_triangles =
+    harmonic_mesh(parameters_[0], downsampling, &vertices[0], &triangles[0]);
+  param_cache_.clear();
+  param_cache_.reserve(n_vertices);
+  for (unsigned int i = 0; i < n_vertices; ++i)
+    param_cache_.emplace_back(localCoordinates(Point2D(vertices[2*i], vertices[2*i+1])));
+  mesh_cache_.clear();
+  mesh_cache_.resizePoints(n_vertices);
+  for (unsigned int i = 0; i < n_triangles; ++i)
+    mesh_cache_.addTriangle(triangles[3*i+0], triangles[3*i+1], triangles[3*i+2]);
 }
 
 TriMesh
 ConcaveGB::evaluate(double resolution) const {
   if (last_resolution_ != resolution) {
-
-    if (resolution > 0) {
-
-    ////////////////////////////////////////////////////////////////////////////
-    //           Generate a new mesh cache with Shewchuk's Triangle           //
-
-    param_cache_.clear();
-    mesh_cache_.clear();
-
-    // Input points
-    size_t n = domain_.size();
-    DoubleVector points; points.reserve(2 * n);
-    for (const auto &p : domain_) {
-      points.push_back(p[0]);
-      points.push_back(p[1]);
-    }
-
-    // Input segments : just a closed polygon
-    std::vector<int> segments; segments.reserve(2 * n);
-    for (size_t i = 0; i < n; ++i) {
-      segments[2*i]   = i;
-      segments[2*i+1] = i + 1;
-    }
-    segments[2*n-1] = 0;
-    
-    // Setup output data structure
-    struct triangulateio in, out;
-    in.pointlist = &points[0];
-    in.numberofpoints = n;
-    in.numberofpointattributes = 0;
-    in.pointmarkerlist = nullptr;
-    in.segmentlist = &segments[0];
-    in.numberofsegments = n;
-    in.segmentmarkerlist = nullptr;
-    in.numberofholes = 0;
-    in.numberofregions = 0;
-
-    // Setup output data structure
-    out.pointlist = nullptr;
-    out.pointattributelist = nullptr;
-    out.pointmarkerlist = nullptr;
-    out.trianglelist = nullptr;
-    out.triangleattributelist = nullptr;
-    out.segmentlist = nullptr;
-    out.segmentmarkerlist = nullptr;
-
-    // Call the library function [with maximum triangle area = resolution]
-    std::ostringstream cmd;
-    cmd << "pqa" << std::fixed << resolution << "DBPzQ";
-    triangulate(const_cast<char *>(cmd.str().c_str()), &in, &out, (struct triangulateio *)nullptr);
-
-    // Process the result
-    param_cache_.reserve(out.numberofpoints);
-    for (int i = 0; i < out.numberofpoints; ++i)
-      param_cache_.emplace_back(localCoordinates(Point2D(out.pointlist[2*i],
-                                                         out.pointlist[2*i+1])));
-    mesh_cache_.resizePoints(param_cache_.size());
-    for (int i = 0; i < out.numberoftriangles; ++i)
-      mesh_cache_.addTriangle(out.trianglelist[3*i+0],
-                              out.trianglelist[3*i+1],
-                              out.trianglelist[3*i+2]);
-
-    //                                                                        //
-    ////////////////////////////////////////////////////////////////////////////
-
-    } else {
-
-    ////////////////////////////////////////////////////////////////////////////
-    //               Generate new mesh by the harmonic bitmap                 //
-
-    unsigned int downsampling = (unsigned int)(-resolution);
-    unsigned int n_vertices = harmonic_mesh_size(parameters_[0], downsampling);
-    DoubleVector vertices(n_vertices * 2);
-    std::vector<unsigned int> triangles(n_vertices * 6);
-    unsigned int n_triangles =
-      harmonic_mesh(parameters_[0], downsampling, &vertices[0], &triangles[0]);
-    param_cache_.clear();
-    param_cache_.reserve(n_vertices);
-    for (unsigned int i = 0; i < n_vertices; ++i)
-      param_cache_.emplace_back(localCoordinates(Point2D(vertices[2*i], vertices[2*i+1])));
-    mesh_cache_.clear();
-    mesh_cache_.resizePoints(n_vertices);
-    for (unsigned int i = 0; i < n_triangles; ++i)
-      mesh_cache_.addTriangle(triangles[3*i+0], triangles[3*i+1], triangles[3*i+2]);
-
-    //                                                                        //
-    ////////////////////////////////////////////////////////////////////////////
-
-    }
-
+    if (resolution > 0)
+      generateDelaunayMesh(resolution);
+    else
+      generateRegularMesh((unsigned int)-resolution);
     last_resolution_ = resolution;
   }
 
@@ -575,13 +567,19 @@ Point3D
 ConcaveGB::evaluate(const DoubleVector &bc) const {
   size_t n = ribbons_.size();
   Point3D result(0, 0, 0);
+
+  // Precompute the (s,d) local coordinates
+  Point2DVector sds; sds.reserve(n);
+  for (size_t i = 0; i < n; ++i)
+    sds.push_back(barycentricSD(bc, i, parameter_dilation_));
+
   double weight_sum = 0.0;
   for (size_t side = 0; side < n; ++side) {
     size_t l = ribbons_[side].size();
     size_t d = ribbons_[side][0].size() - 1;
     for (size_t row = 0; row < l; ++row) {
       for (size_t col = 0; col <= d; ++col) {
-        double blend = weight(bc, side, col, row);
+        double blend = weight(d, sds, side, col, row);
         result += ribbons_[side][row][col] * blend;
         weight_sum += blend;
       }
@@ -601,7 +599,7 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
   case CentralWeight::HARMONIC:
     central_blend = n;
     for (size_t i = 0; i < n; ++i)
-      central_blend *= std::pow(barycentricSD(bc, i)[1], 2);
+      central_blend *= std::pow(sds[i][1], 2);
     break;
   }
 
