@@ -365,16 +365,22 @@ ConcaveGB::generateDomain() {
 
 namespace {
 
-  // B^n_i(u)
-  double
-  bernstein(size_t n, size_t i, double u) {
-    DoubleVector tmp(n + 1, 0.0);
-    tmp[n-i] = 1.0;
+  // B^n_i(u) for all i = 0..n
+  DoubleVector
+  bernstein(size_t n, double u) {
+    DoubleVector coeff; coeff.reserve(n + 1);
+    coeff.push_back(1.0);
     double u1 = 1.0 - u;
-    for (size_t k = 1; k <= n; ++k)
-      for (size_t j = n; j >= k; --j)
-        tmp[j] = tmp[j-1] * u + tmp[j] * u1;
-    return tmp[n];
+    for (size_t j = 1; j <= n; ++j) {
+      double saved = 0.0;
+      for (size_t k = 0; k < j; ++k) {
+        double  tmp = coeff[k];
+        coeff[k] = saved + tmp * u1;
+        saved = tmp * u;
+      }
+      coeff.push_back(saved);
+    }
+    return coeff;
   }
 
   // Returns the index of the segment closest to p.
@@ -412,18 +418,15 @@ namespace {
     return Point2D(s, d);
   }
 
-  // Returns C^i_{j,k}, given the local coordinates sds (side i, row k, column j).
+  // Returns mu^i_{j,k}, given the local coordinates sds (side i, row k, column j).
   double
   weight(size_t d, const Point2DVector &sds, size_t i, size_t j, size_t k) {
     size_t n = sds.size();
-    const Point2D &sd = sds[i];
-    double w = bernstein(d, j, sd[0]) * bernstein(d, k, sd[1]);
     double mu = 1.0;
     if (k < 2 && j < 2) {
       // alpha
       size_t im = (i + n - 1) % n;
-      const Point2D &sdm = sds[im];
-      double di2 = std::pow(sd[1], 2), dim2 = std::pow(sdm[1], 2);
+      double di2 = std::pow(sds[i][1], 2), dim2 = std::pow(sds[im][1], 2);
       double denom = dim2 + di2;
       if (denom < EPSILON)
         mu = 0.5;
@@ -432,8 +435,7 @@ namespace {
     } else if (k < 2 && j > d - 2) {
       // beta
       size_t ip = (i + 1) % n;
-      const Point2D &sdp = sds[ip];
-      double di2 = std::pow(sd[1], 2), dip2 = std::pow(sdp[1], 2);
+      double di2 = std::pow(sds[i][1], 2), dip2 = std::pow(sds[ip][1], 2);
       double denom = dip2 + di2;
       if (denom < EPSILON)
         mu = 0.5;
@@ -443,7 +445,7 @@ namespace {
       mu = 0.0;
     else if (j == k || j == d - k)
       mu = 0.5;
-    return w * mu;
+    return mu;
   }
 
 }
@@ -577,9 +579,11 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
   for (size_t side = 0; side < n; ++side) {
     size_t l = ribbons_[side].size();
     size_t d = ribbons_[side][0].size() - 1;
+    DoubleVector bl_s = bernstein(d, sds[side][0]);
+    DoubleVector bl_d = bernstein(d, sds[side][1]);
     for (size_t row = 0; row < l; ++row) {
       for (size_t col = 0; col <= d; ++col) {
-        double blend = weight(d, sds, side, col, row);
+        double blend = bl_s[col] * bl_d[row] * weight(d, sds, side, col, row);
         result += ribbons_[side][row][col] * blend;
         weight_sum += blend;
       }
