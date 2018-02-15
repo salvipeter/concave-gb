@@ -3,6 +3,7 @@ link_directories(${EXTERNAL_LIBRARIES})
 
 add_library(cgb SHARED
   cgb.cc
+  lsq-plane.cc
   ${LIBTRIANGLE_OBJECT}
   )
 
