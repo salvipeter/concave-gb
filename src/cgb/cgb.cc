@@ -3,6 +3,8 @@
 #include <numeric>
 #include <sstream>
 
+#include "Eigen/SVD"
+
 #include <harmonic.h>
 
 #define ANSI_DECLARATORS
@@ -304,17 +306,10 @@ namespace {
 
 }
 
-void
-ConcaveGB::generateDomain() {
-  // Invalidate everything
-  domain_.clear();
-  for (auto p : parameters_)
-    harmonic_free(p);
-  parameters_.clear();
-  last_resolution_ = std::nan("");
-  param_cache_.clear();
-  mesh_cache_.clear();
-
+// Generates a domain that mimics the angles and arc lengths of the boundaries.
+Point2DVector
+ConcaveGB::generateSimilarityDomain() const {
+  Point2DVector domain;
   size_t n = ribbons_.size();
 
   // Compute lengths
@@ -341,14 +336,92 @@ ConcaveGB::generateDomain() {
   if (!normalizeSmallerAngles(angles))
     normalizeInnerAngles(angles);
 
-  domain_ = generateAngleLengthDomain(angles, lengths);
+  domain = generateAngleLengthDomain(angles, lengths);
 
-  while (!isDomainValid(domain_, domain_tolerance_)) {
+  while (!isDomainValid(domain, domain_tolerance_)) {
     enlargeDomainAngles(angles);
-    domain_ = generateAngleLengthDomain(angles, lengths);
+    domain = generateAngleLengthDomain(angles, lengths);
   }
 
+  return domain;
+}
+
+namespace {
+
+  // Generates an orthogonal (u,v) coordinate system in the plane defined by `normal`.
+  void localSystem(const Vector3D &normal, Vector3D &u, Vector3D &v) {
+    int maxi = 0, nexti = 1;
+    double max = std::abs(normal[0]), next = std::abs(normal[1]);
+    if (max < next) {
+      std::swap(max, next);
+      std::swap(maxi, nexti);
+    }
+    if (std::abs(normal[2]) > max) {
+      nexti = maxi;
+      maxi = 2;
+    } else if (std::abs(normal[2]) > next)
+      nexti = 2;
+
+    u = Vector3D(0, 0, 0);
+    u[nexti] = -normal[maxi];
+    u[maxi] = normal[nexti];
+    u /= u.norm();
+    v = normal ^ u;
+  }
+
+}
+
+// Generates a domain by projecting the corner vertices in a LSQ-fit plane.
+Point2DVector
+ConcaveGB::generateProjectedDomain() const {
+  Point2DVector domain;
+
+  size_t n = ribbons_.size();
+
+  // Compute centroid
+  Point3D centroid(0, 0, 0);
+  for (const auto &r : ribbons_)
+    centroid += r[0][0];
+  centroid /= n;
+
+  Eigen::MatrixXd A(n, 3);
+  for (size_t i = 0; i < n; ++i) {
+    auto p = ribbons_[i][0][0] - centroid;
+    A.row(i) << p[0], p[1], p[2];
+  }
+  auto x = A.jacobiSvd(Eigen::ComputeFullV).matrixV().col(2);
+
+  Vector3D u, v, normal = Vector3D(x(0), x(1), x(2)).normalize();
+  localSystem(normal, u, v);
+  for (const auto &r : ribbons_) {
+    const auto &p = r[0][0];
+    auto q = p - normal * ((p - centroid) * normal);
+    domain.emplace_back(q * u, q * v);
+  }
+
+  rescaleDomain(domain);
+
+  return domain;
+}
+
+void
+ConcaveGB::generateDomain() {
+  // Invalidate everything
+  domain_.clear();
+  for (auto p : parameters_)
+    harmonic_free(p);
+  parameters_.clear();
+  last_resolution_ = std::nan("");
+  param_cache_.clear();
+  mesh_cache_.clear();
+
+  if (domain_tolerance_ > 0)
+    domain_ = generateSimilarityDomain();
+  else
+    domain_ = generateProjectedDomain();
+
   // Setup parameterization
+  size_t n = ribbons_.size();
   DoubleVector points; points.reserve(3 * n);
   for (const auto &p : domain_) {
     points.push_back(p[0]);

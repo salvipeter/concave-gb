@@ -33,6 +33,7 @@ public:
 
   // The given tolerance controls the minimum distance between non-adjacent segments.
   // Note that the domain is always normalized to the [-1,1]x[-1,1] square.
+  // When set to 0, a simple least-squares projection is used.
   void setDomainTolerance(double tolerance);
 
   // Alternative parameterization - positive values result in smaller weight deficiency.
@@ -87,6 +88,8 @@ public:
   TriMesh evaluate(double resolution) const;
 
 private:
+  Point2DVector generateSimilarityDomain() const;
+  Point2DVector generateProjectedDomain() const;
   void generateDelaunayMesh(double resolution) const;
   void generateRegularMesh(size_t downsampling) const;
   DoubleVector localCoordinates(const Point2D &uv) const;
