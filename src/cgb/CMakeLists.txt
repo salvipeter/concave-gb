@@ -1,4 +1,4 @@
-include_directories(${EXTERNAL_INCLUDES} ../../dependencies)
+include_directories(${EXTERNAL_INCLUDES} ../../dependencies/eigen)
 link_directories(${EXTERNAL_LIBRARIES})
 
 add_library(cgb SHARED

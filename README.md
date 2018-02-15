@@ -11,10 +11,11 @@ You will need the following libraries:
 - libgeom, which is part of the [transfinite](https://bitbucket.org/salvipeter/transfinite) library
 - [libharmonic](https://github.com/salvipeter/harmonic)
 - Shewchuk's [Triangle](http://www.cs.cmu.edu/%7Equake/triangle.html)
+- [Eigen](https://eigen.tuxfamily.org/)
 
 ### Building under Linux ###
 
-Download and compile the dependencies.
+Download and compile the dependencies. Put `eigen` under the `dependencies` folder.
 Note that you have to build Triangle as a library with the `-fpic` flag.
 
 ```
@@ -31,7 +32,7 @@ Note that you have to build Triangle as a library with the `-fpic` flag.
 
 ### Building under Windows ###
 
-Download the dependencies into `dependencies/{transfinite,harmonic,triangle}`.
+Download the dependencies into `dependencies/{transfinite,harmonic,triangle,eigen}`.
 A Visual Studio 2015 solution file is supplied for compilation.
 
 ## Usage ##

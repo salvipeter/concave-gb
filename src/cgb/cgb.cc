@@ -386,7 +386,7 @@ ConcaveGB::generateProjectedDomain() const {
 
   Eigen::MatrixXd A(n, 3);
   for (size_t i = 0; i < n; ++i) {
-    auto p = ribbons_[i][0][0] - centroid;
+    auto p = ribbons_[i][0].back() - centroid;
     A.row(i) << p[0], p[1], p[2];
   }
   auto x = A.jacobiSvd(Eigen::ComputeFullV).matrixV().col(2);
@@ -394,7 +394,7 @@ ConcaveGB::generateProjectedDomain() const {
   Vector3D u, v, normal = Vector3D(x(0), x(1), x(2)).normalize();
   localSystem(normal, u, v);
   for (const auto &r : ribbons_) {
-    const auto &p = r[0][0];
+    const auto &p = r[0].back();
     auto q = p - normal * ((p - centroid) * normal);
     domain.emplace_back(q * u, q * v);
   }
