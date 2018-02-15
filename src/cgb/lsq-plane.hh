@@ -8,7 +8,7 @@ using namespace Geometry;
 
 struct Plane {
   Point3D p;
-  Vector3D n;
+  Vector3D u, v, n;
 };
 
 Plane fitPlane(const PointVector &pv);
