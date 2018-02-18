@@ -287,20 +287,23 @@ namespace {
   // If there are no concave angles, it returns false.
   bool
   enlargeDomainAngles(DoubleVector &angles) {
+    const double factor = 1.1;
     auto flip = [](double alpha) { return M_PI - alpha; };
     size_t concave_count = 0;
     double angle_sum = 0.0;
     for (const auto &angle : angles) {
-      if (angle < 0)
+      if (angle < 0) {
         ++concave_count;
-      angle_sum += flip(angle);
+        angle_sum += flip(angle);
+      } else
+        angle_sum += flip(angle) * factor;
     }
     if (concave_count == 0)
       return false;
     double target = (angles.size() - 2) * M_PI;
     double delta = (target - angle_sum) / concave_count;
     for (auto &angle : angles)
-      angle = angle < 0 ? flip(flip(angle) + delta) : flip(flip(angle) * 1.1);
+      angle = angle < 0 ? flip(flip(angle) + delta) : flip(flip(angle) * factor);
     return true;
   }
 
