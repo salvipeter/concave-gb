@@ -646,6 +646,23 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
     }
   }
 
+  // Add control points to the concave corners (experimental)
+  for (size_t i = 0; i < n; ++i) {
+    size_t ip = (i + 1) % n;
+    auto &r1 = ribbons_[i];
+    auto &r2 = ribbons_[ip];
+    size_t d = r1[0].size() - 1;
+    auto v1 = (r1[0][d] - r1[0][d-1]).normalize();
+    if (v1 * (r2[1][0] - r2[0][0]) < 0)
+      continue;
+    Point3D cp = (r1[1][d] * 2 - r1[1][d-1] + r2[1][0] * 2 - r2[1][1]) / 2.0;
+    bernstein(d, sds[i][1], bl_s);
+    bernstein(d, sds[ip][1], bl_d);
+    double blend = bl_s[2] * bl_d[2];
+    result += cp * blend;
+    weight_sum += blend;
+  }
+
   double central_blend = 0.0;
   switch (central_weight_) {
   case CentralWeight::ORIGINAL:
