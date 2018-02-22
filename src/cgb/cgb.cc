@@ -609,8 +609,13 @@ ConcaveGB::evaluate(double resolution) const {
   def_max = 0; def_sum = 0;
   for (size_t i = 0, ie = param_cache_.size(); i != ie; ++i)
     mesh_cache_[i] = evaluate(param_cache_[i]);
-  std::cout << "Def. max: " << def_max << std::endl;
-  std::cout << "Def. sum: " << def_sum << std::endl;
+
+  {
+    std::ofstream f("deficiency.txt");
+    f << "Def. max: " << def_max << std::endl;
+    f << "Def. sum: " << def_sum << std::endl;
+  }
+
   return mesh_cache_;
 }
 
