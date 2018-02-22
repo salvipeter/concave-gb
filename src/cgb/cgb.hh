@@ -104,6 +104,9 @@ private:
   std::vector<HarmonicMap *> parameters_;
   std::vector<Ribbon> ribbons_;
 
+  // Just for testing
+  mutable double def_max, def_sum;
+
   // Caching
   mutable double last_resolution_;
   mutable std::vector<DoubleVector> param_cache_;

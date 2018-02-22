@@ -1,5 +1,7 @@
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <iostream>
 #include <numeric>
 #include <sstream>
 
@@ -379,6 +381,21 @@ ConcaveGB::generateDomain() {
   else
     domain_ = generateProjectedDomain();
 
+  {
+    auto scale = [](Point2D p) {
+      return (p + Point2D(1,1)) * 250 + Point2D(50,50);
+    };
+    std::ofstream f("domain.eps");
+    f << "newpath\n";
+    auto q = scale(domain_.back());
+    f << q[0] << ' ' << q[1] << " moveto\n";
+    for (const auto &p : domain_) {
+      auto q = scale(p);
+      f << q[0] << ' ' << q[1] << " lineto\n";
+    }
+    f << "stroke\nshowpage" << std::endl;
+  }
+
   // Setup parameterization
   size_t n = ribbons_.size();
   DoubleVector points; points.reserve(3 * n);
@@ -589,8 +606,11 @@ ConcaveGB::evaluate(double resolution) const {
   }
 
   // Evaluate based on the cached barycentric coordinates
+  def_max = 0; def_sum = 0;
   for (size_t i = 0, ie = param_cache_.size(); i != ie; ++i)
     mesh_cache_[i] = evaluate(param_cache_[i]);
+  std::cout << "Def. max: " << def_max << std::endl;
+  std::cout << "Def. sum: " << def_sum << std::endl;
   return mesh_cache_;
 }
 
@@ -637,6 +657,11 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
       central_blend *= std::pow(sds[i][1], 2);
     break;
   }
+
+  double def = 1.0 - (weight_sum + central_blend);
+  def_sum += def;
+  if (std::abs(def) > std::abs(def_max))
+    def_max = def;
 
   result += central_cp_ * central_blend;
   result /= weight_sum + central_blend;
