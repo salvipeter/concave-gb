@@ -636,7 +636,7 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
     size_t l = ribbons_[side].size();
     size_t d = ribbons_[side][0].size() - 1;
     bernstein(d, sds[side][0], bl_s);
-    bernstein(d, sds[side][1], bl_d);
+    bernstein(2 * l - 1, sds[side][1], bl_d);
     for (size_t row = 0; row < l; ++row) {
       for (size_t col = 0; col <= d; ++col) {
         double blend = bl_s[col] * bl_d[row] * weight(d, sds, side, col, row);
@@ -646,22 +646,25 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
     }
   }
 
+#ifdef CONCAVE_CONTROL_POINTS
   // Add control points to the concave corners (experimental)
   for (size_t i = 0; i < n; ++i) {
     size_t ip = (i + 1) % n;
     auto &r1 = ribbons_[i];
     auto &r2 = ribbons_[ip];
+    size_t l1 = r1.size(), l2 = r2.size();
     size_t d = r1[0].size() - 1;
     auto v1 = (r1[0][d] - r1[0][d-1]).normalize();
     if (v1 * (r2[1][0] - r2[0][0]) < 0)
       continue;
     Point3D cp = (r1[1][d] * 2 - r1[1][d-1] + r2[1][0] * 2 - r2[1][1]) / 2.0;
-    bernstein(d, sds[i][1], bl_s);
-    bernstein(d, sds[ip][1], bl_d);
+    bernstein(2 * l1 - 1, sds[i][1], bl_s);
+    bernstein(2 * l2 - 1, sds[ip][1], bl_d);
     double blend = bl_s[2] * bl_d[2];
     result += cp * blend;
     weight_sum += blend;
   }
+#endif
 
   double central_blend = 0.0;
   switch (central_weight_) {
