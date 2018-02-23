@@ -4,6 +4,7 @@
 #include <iostream>
 #include <numeric>
 #include <sstream>
+#include <stack>
 
 #include <harmonic.h>
 
@@ -406,7 +407,7 @@ ConcaveGB::generateDomain() {
   }
   for (size_t i = 0; i < n; ++i) {
     points[3*i+2] = 1;
-    auto map = harmonic_init(n, &points[0], param_levels_, EPSILON);
+    auto map = harmonic_init(n, &points[0], param_levels_, EPSILON, false);
     parameters_.push_back(map);
     points[3*i+2] = 0;
   }
@@ -578,21 +579,95 @@ ConcaveGB::generateDelaunayMesh(double resolution) const {
                             out.trianglelist[3*i+2]);
 }
 
-// Generates a new mesh cache using the harmonic library.
+namespace {
+
+  void floodFill(std::vector<bool> &grid, size_t n, size_t x, size_t y) {
+    using Coord = std::pair<size_t, size_t>;
+    std::stack<Coord> ps;
+    ps.push({x, y});
+    do {
+	  size_t x = ps.top().first, y = ps.top().second; // auto [x, y] = ps.top();
+      ps.pop();
+      if (grid[y*n+x])
+        continue;
+      grid[y*n+x] = true;
+      if (x > 0)     ps.push({x - 1, y});
+      if (x < n - 1) ps.push({x + 1, y});
+      if (y > 0)     ps.push({x,     y - 1});
+      if (y < n - 1) ps.push({x,     y + 1});
+    } while (!ps.empty());
+  }
+
+  // Generates a mesh using a discretization of the domain (using a bitmap of size 2^size).
+  // Assumes that domain is in [-1,1]x[-1,1].
+  TriMesh regularMesh(const Point2DVector &domain, size_t size) {
+    size_t n = (size_t)std::pow(2, size);
+    std::vector<bool> grid(n * n, false);
+    Point2D offset(-1.05, -1.05);
+    double scaling = n / 2.1;
+
+    // Init
+    Point2D p0 = (domain.back() - offset) * scaling;
+    int x0 = (int)p0[0], y0 = (int)p0[1];
+    for (const auto &p : domain) {
+      Point2D p1 = (p - offset) * scaling;
+      int x1 = (int)p1[0], y1 = (int)p1[1];
+      int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+      int dy = std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+      int err = (dx > dy ? dx : -dy) / 2, e2;
+      while (true) {
+        grid[y0*n+x0] = true;
+        if (x0 == x1 && y0 == y1)
+          break;
+        e2 = err;
+        if (e2 > -dx) { err -= dy; x0 += sx; }
+        if (e2 <  dy) { err += dx; y0 += sy; }
+      }
+    }
+    floodFill(grid, n, 0, 0);
+
+    // Build mesh
+    std::vector<size_t> row(n);
+    PointVector pv;
+    TriMesh result;
+    size_t index = 0;
+
+    for (size_t j = 1; j < n; ++j) {
+      for (size_t i = 0; i < n - 1; ++i) {
+        if (grid[j*n+i])
+          continue;
+
+        if (grid[(j-1)*n+i+1]) {
+          // no NE
+          if (!grid[(j-1)*n+i] && !grid[j*n+i+1])
+            result.addTriangle(index, row[i], index + 1);   // N & E
+        } else {
+          // NE
+          if (!grid[(j-1)*n+i])
+            result.addTriangle(index, row[i], row[i+1]);    // N & NE
+          if (!grid[j*n+i+1])
+            result.addTriangle(index, row[i+1], index + 1); // E & NE
+        }
+
+        pv.emplace_back((double)i / scaling + offset[0], (double)j / scaling + offset[1], 0.0);
+        row[i] = index++;
+      }
+    }
+
+    result.setPoints(pv);
+    return result;
+  }
+
+}
+
+// Generates a new mesh cache using a bitmap
 void
 ConcaveGB::generateRegularMesh(size_t downsampling) const {
-  size_t n_vertices = harmonic_mesh_size(parameters_[0], downsampling);
-  DoubleVector vertices(n_vertices * 2);
-  std::vector<size_t> triangles(n_vertices * 6);
-  size_t n_triangles = harmonic_mesh(parameters_[0], downsampling, &vertices[0], &triangles[0]);
+  mesh_cache_ = regularMesh(domain_, param_levels_ - downsampling);
   param_cache_.clear();
-  param_cache_.reserve(n_vertices);
-  for (size_t i = 0; i < n_vertices; ++i)
-    param_cache_.emplace_back(localCoordinates(Point2D(vertices[2*i], vertices[2*i+1])));
-  mesh_cache_.clear();
-  mesh_cache_.resizePoints(n_vertices);
-  for (size_t i = 0; i < n_triangles; ++i)
-    mesh_cache_.addTriangle(triangles[3*i+0], triangles[3*i+1], triangles[3*i+2]);
+  param_cache_.reserve(mesh_cache_.points().size());
+  for (const auto &p : mesh_cache_.points())
+    param_cache_.emplace_back(localCoordinates(Point2D(p[0], p[1])));
 }
 
 TriMesh
