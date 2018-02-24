@@ -2,6 +2,7 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <numeric>
 #include <sstream>
 #include <stack>
@@ -467,34 +468,47 @@ namespace {
     return Point2D(s, d);
   }
 
+  // 0 <= k <= n
+  size_t binomial(size_t n, size_t k) {
+    size_t result = 1;
+    for (size_t d = 1; d <= k; ++d, --n)
+      result = result * n / d;
+    return result;
+  }
+
+  double alphaWeight(size_t n, size_t k) {
+    static std::map<std::pair<size_t, size_t>, double> cache;
+    if (auto x = cache.find({n, k}); x != cache.end())
+      return x->second;
+    return cache[{n, k}] =
+      (double)(binomial(n - 3, k) + binomial(n - 3, k - 1) * 3) / binomial(n, k);
+  }
+
   // Returns mu^i_{j,k}, given the local coordinates sds (side i, row k, column j).
   double
-  weight(size_t d, const Point2DVector &sds, size_t i, size_t j, size_t k) {
+  weight(size_t d, const Point2DVector &sds, size_t i, size_t j, size_t) {
     size_t n = sds.size();
-    double mu = 1.0;
-    if (k < 2 && j < 2) {
-      // alpha
-      size_t im = (i + n - 1) % n;
-      double di2 = std::pow(sds[i][1], 2), dim2 = std::pow(sds[im][1], 2);
-      double denom = dim2 + di2;
-      if (denom < EPSILON)
-        mu = 0.5;
-      else
-        mu = dim2 / denom;
-    } else if (k < 2 && j > d - 2) {
-      // beta
-      size_t ip = (i + 1) % n;
-      double di2 = std::pow(sds[i][1], 2), dip2 = std::pow(sds[ip][1], 2);
-      double denom = dip2 + di2;
-      if (denom < EPSILON)
-        mu = 0.5;
-      else
-        mu = dip2 / denom;
-    } else if (j < k || j > d - k)
-      mu = 0.0;
-    else if (j == k || j == d - k)
-      mu = 0.5;
-    return mu;
+
+    double alpha = 0.5, beta = 0.5;
+    size_t im = (i + n - 1) % n;
+    size_t ip = (i + 1) % n;
+    double di2 = std::pow(sds[i][1], 2);
+    double dim2 = std::pow(sds[im][1], 2);
+    double dip2 = std::pow(sds[ip][1], 2);
+    double denom = dim2 + di2;
+    if (denom > EPSILON)
+      alpha = dim2 / denom;
+    denom = dip2 + di2;
+    if (denom > EPSILON)
+      beta = dip2 / denom;
+
+    if (j < 2)
+      return alpha;
+    if (j > d - 2)
+      return beta;
+
+    double x = alphaWeight(d, j);
+    return alpha * x + beta * (1 - x);
   }
 
 }
