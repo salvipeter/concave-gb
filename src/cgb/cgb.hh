@@ -39,6 +39,9 @@ public:
   // Alternative parameterization - positive values result in smaller weight deficiency.
   void setParameterDilation(double dilation);
 
+  // Use biharmonic coordinates (false: use harmonic coordinates).
+  void setBiharmonic(bool biharmonic);
+
   // Sets the central control point position.
   void setCentralControlPoint(const Point3D &p);
 
@@ -99,6 +102,7 @@ private:
   CentralWeight central_weight_;
   double domain_tolerance_;
   double parameter_dilation_;
+  bool use_biharmonic_;
   Point3D central_cp_;
   Point2DVector domain_;
   std::vector<HarmonicMap *> parameters_;

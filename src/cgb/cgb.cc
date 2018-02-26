@@ -30,7 +30,8 @@ namespace CGB {
 
 ConcaveGB::ConcaveGB() :
   param_levels_(9), central_weight_(CentralWeight::ZERO), domain_tolerance_(0.2),
-  parameter_dilation_(0.0), central_cp_(0, 0, 0), last_resolution_(std::nan(""))
+  parameter_dilation_(0.0), use_biharmonic_(false), central_cp_(0, 0, 0),
+  last_resolution_(std::nan(""))
 {
 }
 
@@ -58,6 +59,11 @@ ConcaveGB::setDomainTolerance(double tolerance) {
 void
 ConcaveGB::setParameterDilation(double dilation) {
   parameter_dilation_ = dilation;
+}
+
+void
+ConcaveGB::setBiharmonic(bool biharmonic) {
+  use_biharmonic_ = biharmonic;
 }
 
 void
@@ -408,7 +414,7 @@ ConcaveGB::generateDomain() {
   }
   for (size_t i = 0; i < n; ++i) {
     points[3*i+2] = 1;
-    auto map = harmonic_init(n, &points[0], param_levels_, EPSILON, false);
+    auto map = harmonic_init(n, &points[0], param_levels_, EPSILON, use_biharmonic_);
     parameters_.push_back(map);
     points[3*i+2] = 0;
   }
