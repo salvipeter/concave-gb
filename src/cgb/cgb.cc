@@ -484,7 +484,8 @@ namespace {
 
   double alphaWeight(size_t n, size_t k) {
     static std::map<std::pair<size_t, size_t>, double> cache;
-    if (auto x = cache.find({n, k}); x != cache.end())
+	auto x = cache.find({ n, k });
+    if (x != cache.end())
       return x->second;
     return cache[{n, k}] =
       (double)(binomial(n - 3, k) + binomial(n - 3, k - 1) * 3) / binomial(n, k);
