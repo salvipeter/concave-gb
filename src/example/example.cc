@@ -4,9 +4,9 @@
 #include "cgb.hh"
 
 int main(int argc, char **argv) {
-  if (argc < 3 || argc > 6) {
+  if (argc < 3 || argc > 7) {
     std::cerr << "Usage: " << argv[0]
-              << " input.cgb output.obj [resolution] [levels] [biharmonic]"
+              << " input.cgb output.obj [resolution] [levels] [biharmonic] [fill-concave]"
               << std::endl;
     return 1;
   }
@@ -32,6 +32,11 @@ int main(int argc, char **argv) {
       cgb.setBiharmonic(true);
   }
 
+  if (argc > 6) {
+    if (std::string(argv[6]) == "true")
+      cgb.setFillConcaveCorners(true);
+  }
+
 #ifdef DEBUG
   std::cout << "Compiled in DEBUG mode" << std::endl;
 #else
@@ -42,6 +47,8 @@ int main(int argc, char **argv) {
   std::cout << "Resolution: " << resolution << std::endl;
   std::cout << "Param. level: " << (argc > 4 ? argv[4] : "9") << std::endl;
   std::cout << "Biharmonic: " << (argc > 5 && std::string(argv[5]) == "true" ? "true" : "false")
+            << std::endl;
+  std::cout << "Fill corners: " << (argc > 6 && std::string(argv[6]) == "true" ? "true" : "false")
             << std::endl;
 
   {

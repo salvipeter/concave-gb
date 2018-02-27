@@ -30,8 +30,8 @@ namespace CGB {
 
 ConcaveGB::ConcaveGB() :
   param_levels_(9), central_weight_(CentralWeight::ZERO), domain_tolerance_(0.2),
-  parameter_dilation_(0.0), use_biharmonic_(false), central_cp_(0, 0, 0),
-  last_resolution_(std::nan(""))
+  parameter_dilation_(0.0), use_biharmonic_(false), fill_concave_corners_(false),
+  central_cp_(0, 0, 0), last_resolution_(std::nan(""))
 {
 }
 
@@ -69,6 +69,11 @@ ConcaveGB::setBiharmonic(bool biharmonic) {
 void
 ConcaveGB::setCentralControlPoint(const Point3D &p) {
   central_cp_ = p;
+}
+
+void
+ConcaveGB::setFillConcaveCorners(bool fill_concave) {
+  fill_concave_corners_ = fill_concave;
 }
 
 bool
@@ -742,25 +747,30 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
     }
   }
 
-#ifdef CONCAVE_CONTROL_POINTS
-  // Add control points to the concave corners (experimental)
-  for (size_t i = 0; i < n; ++i) {
-    size_t ip = (i + 1) % n;
-    auto &r1 = ribbons_[i];
-    auto &r2 = ribbons_[ip];
-    size_t l1 = r1.size(), l2 = r2.size();
-    size_t d = r1[0].size() - 1;
-    auto v1 = (r1[0][d] - r1[0][d-1]).normalize();
-    if (v1 * (r2[1][0] - r2[0][0]) < 0)
-      continue;
-    Point3D cp = (r1[1][d] * 2 - r1[1][d-1] + r2[1][0] * 2 - r2[1][1]) / 2.0;
-    bernstein(2 * l1 - 1, sds[i][1], bl_s);
-    bernstein(2 * l2 - 1, sds[ip][1], bl_d);
-    double blend = bl_s[2] * bl_d[2];
-    result += cp * blend;
-    weight_sum += blend;
+  if (fill_concave_corners_) {
+    for (size_t i = 0; i < n; ++i) {
+      size_t ip = (i + 1) % n;
+      auto &r1 = ribbons_[i];
+      auto &r2 = ribbons_[ip];
+      size_t l1 = r1.size(), l2 = r2.size();
+      size_t d = r1[0].size() - 1;
+      auto v1 = (r1[0][d] - r1[0][d-1]).normalize();
+      if (v1 * (r2[1][0] - r2[0][0]) < 0)
+        continue;
+      Point3D cp = (r1[1][d] * 2 - r1[1][d-1] + r2[1][0] * 2 - r2[1][1]) / 2.0;
+      bernstein(2 * l1 - 1, sds[i][1], bl_s);
+      bernstein(2 * l2 - 1, sds[ip][1], bl_d);
+      double beta = 0.0;
+      double di2 = std::pow(sds[i][1], 2);
+      double dip2 = std::pow(sds[ip][1], 2);
+      double denom = dip2 + di2;
+      if (denom > EPSILON)
+        beta = dip2 / denom;
+      double blend = beta * (1.0 - beta) * 5.0 * bl_s[1] * bl_d[1];
+      result += cp * blend;
+      weight_sum += blend;
+    }
   }
-#endif
 
   double central_blend = 0.0;
   switch (central_weight_) {

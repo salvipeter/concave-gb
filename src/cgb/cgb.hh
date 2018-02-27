@@ -45,6 +45,9 @@ public:
   // Sets the central control point position.
   void setCentralControlPoint(const Point3D &p);
 
+  // Add a dummy control point at all concave corners
+  void setFillConcaveCorners(bool fill_concave);
+
   // Sets the ribbons. Note that this does not set the central control point.
   // If generate_domain is set to false, the program assumes that the domain can stay the same.
   // A Ribbon consists of rows of control points, each row contains degree + 1 control points.
@@ -103,6 +106,7 @@ private:
   double domain_tolerance_;
   double parameter_dilation_;
   bool use_biharmonic_;
+  bool fill_concave_corners_;
   Point3D central_cp_;
   Point2DVector domain_;
   std::vector<HarmonicMap *> parameters_;
