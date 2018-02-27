@@ -534,7 +534,7 @@ ConcaveGB::localCoordinates(const Point2D &uv) const {
       result[k] = x;
       return result;
     }
-    result[i] = value;
+    result[i] = inrange(0.0, value, 1.0);
   }
   return result;
 }

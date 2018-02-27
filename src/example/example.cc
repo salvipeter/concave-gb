@@ -6,7 +6,7 @@
 int main(int argc, char **argv) {
   if (argc < 3 || argc > 6) {
     std::cerr << "Usage: " << argv[0]
-              << " input.cgb output.obj [resolution] [levels]"
+              << " input.cgb output.obj [resolution] [levels] [biharmonic]"
               << std::endl;
     return 1;
   }
@@ -27,12 +27,9 @@ int main(int argc, char **argv) {
     cgb.setParamLevels(levels);
   }
 
-  {
-    std::ifstream f(argv[1]);
-    if (!f.is_open() || !cgb.loadOptions(f) || !cgb.loadControlPoints(f)) {
-      std::cerr << "Cannot open file: " << argv[1] << std::endl;
-      return 2;
-    }
+  if (argc > 5) {
+    if (std::string(argv[5]) == "true")
+      cgb.setBiharmonic(true);
   }
 
 #ifdef DEBUG
@@ -40,6 +37,20 @@ int main(int argc, char **argv) {
 #else
   std::cout << "Compiled in RELEASE mode" << std::endl;
 #endif
+  std::cout << "Input: " << argv[1] << std::endl;
+  std::cout << "Output: " << argv[2] << std::endl;
+  std::cout << "Resolution: " << resolution << std::endl;
+  std::cout << "Param. level: " << (argc > 4 ? argv[4] : "9") << std::endl;
+  std::cout << "Biharmonic: " << (argc > 5 && std::string(argv[5]) == "true" ? "true" : "false")
+            << std::endl;
+
+  {
+    std::ifstream f(argv[1]);
+    if (!f.is_open() || !cgb.loadOptions(f) || !cgb.loadControlPoints(f)) {
+      std::cerr << "Cannot open file: " << argv[1] << std::endl;
+      return 2;
+    }
+  }
 
   cgb.evaluate(resolution).writeOBJ(argv[2]);
 
