@@ -444,27 +444,6 @@ namespace {
     }
   }
 
-  // Returns the index of the segment closest to p.
-  // An edge is defined by vertices i-1 and i.
-  // (This computes the distances from _lines_, not segments.)
-  size_t
-  closestEdge(const Point2DVector &points, const Point2D &p) {
-    size_t n = points.size();
-    size_t result = 0;
-    double min = -1;
-    for (size_t i = 0; i < n; ++i) {
-      size_t im = (i + n - 1) % n;
-      Vector2D dev = p - points[im];
-      Vector2D dir = (points[i] - points[im]).normalize();
-      double dist = (dev - dir * (dev * dir)).norm();
-      if (min < 0 || dist < min) {
-        min = dist;
-        result = i;
-      }
-    }
-    return result;
-  }
-
   // Returns the (s,d) system for side i, given the barycentric coordinates bc.
   Point2D
   barycentricSD(const DoubleVector &bc, size_t i, double dilation) {
@@ -528,19 +507,23 @@ namespace {
 // Returns the barycentric coordinates for an (u,v) point in the domain.
 DoubleVector
 ConcaveGB::localCoordinates(const Point2D &uv) const {
-  size_t n = parameters_.size();
+  size_t n = parameters_.size(), small = 0;
   DoubleVector result(n, 0.0);
   for (size_t i = 0; i < n; ++i) {
-    double value;
-    if (!harmonic_eval(parameters_[i], const_cast<double *>(uv.data()), &value)) {
-      // linear interpolation
-      size_t k = closestEdge(domain_, uv), km = (k + n - 1) % n;
-      double x = (uv - domain_[km]).norm() / (domain_[k] - domain_[km]).norm();
-      result[km] = 1 - x;
-      result[k] = x;
-      return result;
-    }
-    result[i] = inrange(0.0, value, 1.0);
+    harmonic_eval(parameters_[i], const_cast<double *>(uv.data()), &result[i]);
+    if (result[i] < EPSILON)
+      ++small;
+  }
+  if (small == n - 2) {
+    size_t i = 0;
+    while (result[++i] < EPSILON);
+    if (i == 1 && result[0] >= EPSILON)
+      i = 0;
+    size_t ip = (i + 1) % n;
+    result = DoubleVector(n, 0.0);
+    double x = (uv - domain_[i]).norm() / (domain_[ip] - domain_[i]).norm();
+    result[i] = 1.0 - x;
+    result[ip] = x;
   }
   return result;
 }
