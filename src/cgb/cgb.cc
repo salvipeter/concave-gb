@@ -91,7 +91,7 @@ ConcaveGB::loadOptions(std::istream &is) {
   unsigned int cw;
   is >> cw >> domain_tolerance_ >> parameter_dilation_;
 
-  if (cw > 3 || domain_tolerance_ < 0 || parameter_dilation_ < 0)
+  if (cw > 3 || parameter_dilation_ < 0)
     return false;
 
   central_weight_ = static_cast<CentralWeight>(cw);
@@ -351,12 +351,12 @@ ConcaveGB::generateSimilarityDomain() const {
     angles.push_back(alpha);
   }
 
-  if (!normalizeSmallerAngles(angles))
+  if (domain_tolerance_ < 0 || !normalizeSmallerAngles(angles))
     normalizeInnerAngles(angles);
 
   domain = generateAngleLengthDomain(angles, lengths);
 
-  while (!isDomainValid(domain, domain_tolerance_)) {
+  while (!isDomainValid(domain, std::abs(domain_tolerance_))) {
     enlargeDomainAngles(angles);
     domain = generateAngleLengthDomain(angles, lengths);
   }
@@ -389,10 +389,10 @@ ConcaveGB::generateDomain() {
   param_cache_.clear();
   mesh_cache_.clear();
 
-  if (domain_tolerance_ > 0)
-    domain_ = generateSimilarityDomain();
-  else
+  if (domain_tolerance_ == 0.0)
     domain_ = generateProjectedDomain();
+  else
+    domain_ = generateSimilarityDomain();
 
   {
     auto scale = [](Point2D p) {
