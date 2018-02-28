@@ -475,9 +475,9 @@ namespace {
       (double)(binomial(n - 3, k) + binomial(n - 3, k - 1) * 3) / binomial(n, k);
   }
 
-  // Returns mu^i_{j,k}, given the local coordinates sds (side i, row k, column j).
+  // Returns mu^i_j, given the local coordinates sds (side i, column j).
   double
-  weight(size_t d, const Point2DVector &sds, size_t i, size_t j, size_t) {
+  weight(size_t d, const Point2DVector &sds, size_t i, size_t j) {
     size_t n = sds.size();
 
     double alpha = 0.5, beta = 0.5;
@@ -723,7 +723,7 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
     bernstein(2 * l - 1, sds[side][1], bl_d);
     for (size_t row = 0; row < l; ++row) {
       for (size_t col = 0; col <= d; ++col) {
-        double blend = bl_s[col] * bl_d[row] * weight(d, sds, side, col, row);
+        double blend = bl_s[col] * bl_d[row] * weight(d, sds, side, col);
         result += ribbons_[side][row][col] * blend;
         weight_sum += blend;
       }
