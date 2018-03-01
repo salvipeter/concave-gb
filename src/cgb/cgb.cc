@@ -458,48 +458,32 @@ namespace {
     return Point2D(s, d);
   }
 
-  // 0 <= k <= n
-  size_t binomial(size_t n, size_t k) {
-    size_t result = 1;
-    for (size_t d = 1; d <= k; ++d, --n)
-      result = result * n / d;
-    return result;
-  }
-
-  double alphaWeight(size_t n, size_t k) {
-    static std::map<std::pair<size_t, size_t>, double> cache;
-	auto x = cache.find({ n, k });
-    if (x != cache.end())
-      return x->second;
-    return cache[{n, k}] =
-      (double)(binomial(n - 3, k) + binomial(n - 3, k - 1) * 3) / binomial(n, k);
-  }
-
   // Returns mu^i_j, given the local coordinates sds (side i, column j).
   double
   weight(size_t d, const Point2DVector &sds, size_t i, size_t j) {
-    size_t n = sds.size();
-
-    double alpha = 0.5, beta = 0.5;
-    size_t im = (i + n - 1) % n;
-    size_t ip = (i + 1) % n;
-    double di2 = std::pow(sds[i][1], 2);
-    double dim2 = std::pow(sds[im][1], 2);
-    double dip2 = std::pow(sds[ip][1], 2);
-    double denom = dim2 + di2;
-    if (denom > EPSILON)
-      alpha = dim2 / denom;
-    denom = dip2 + di2;
-    if (denom > EPSILON)
-      beta = dip2 / denom;
-
-    if (j < 2)
+    if (j < 2) {
+      size_t n = sds.size();
+      double alpha = 0.5;
+      size_t im = (i + n - 1) % n;
+      double di2 = std::pow(sds[i][1], 2);
+      double dim2 = std::pow(sds[im][1], 2);
+      double denom = dim2 + di2;
+      if (denom > EPSILON)
+        alpha = dim2 / denom;
       return alpha;
-    if (j > d - 2)
+    }
+    if (j > d - 2) {
+      size_t n = sds.size();
+      double beta = 0.5;
+      size_t ip = (i + 1) % n;
+      double di2 = std::pow(sds[i][1], 2);
+      double dip2 = std::pow(sds[ip][1], 2);
+      double denom = dip2 + di2;
+      if (denom > EPSILON)
+        beta = dip2 / denom;
       return beta;
-
-    double x = alphaWeight(d, j);
-    return alpha * x + beta * (1 - x);
+    }
+    return 1.0;
   }
 
 }
