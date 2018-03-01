@@ -747,7 +747,14 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
   case CentralWeight::ZERO:
     break;
   case CentralWeight::NTH:
-    central_blend = (1.0 - weight_sum) / (double)n;
+    central_blend = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+      size_t ip = (i + 1) % n;
+      central_blend +=
+        std::pow(sds[i][1], 2) * std::pow(1.0 - sds[i][1], 2) *
+        std::pow(sds[ip][1], 2) * std::pow(1.0 - sds[ip][1], 2);
+    }
+    central_blend *= n;
     break;
   case CentralWeight::HARMONIC:
     central_blend = n;
