@@ -737,8 +737,8 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
       double dip2 = std::pow(sds[ip][1], 2);
       double denom = dip2 + di2;
       if (denom > EPSILON)
-        beta = dip2 / denom;
-      double blend = beta * (1.0 - beta) * 5.0 * bl_s[1] * bl_d[1];
+        beta = di2 * dip2 / denom;
+      double blend = beta * bl_s[1] * bl_d[1];
       result += cp * blend;
       weight_sum += blend;
     }
