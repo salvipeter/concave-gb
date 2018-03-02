@@ -39,8 +39,14 @@ public:
   // Alternative parameterization - positive values result in smaller weight deficiency.
   void setParameterDilation(double dilation);
 
+  // Use biharmonic coordinates (false: use harmonic coordinates).
+  void setBiharmonic(bool biharmonic);
+
   // Sets the central control point position.
   void setCentralControlPoint(const Point3D &p);
+
+  // Add a dummy control point at all concave corners
+  void setFillConcaveCorners(bool fill_concave);
 
   // Sets the ribbons. Note that this does not set the central control point.
   // If generate_domain is set to false, the program assumes that the domain can stay the same.
@@ -99,10 +105,21 @@ private:
   CentralWeight central_weight_;
   double domain_tolerance_;
   double parameter_dilation_;
+  bool use_biharmonic_;
+  bool fill_concave_corners_;
   Point3D central_cp_;
   Point2DVector domain_;
   std::vector<HarmonicMap *> parameters_;
   std::vector<Ribbon> ribbons_;
+
+  struct ExtraCP {
+    size_t i;
+    Point3D p;
+  };
+  std::vector<ExtraCP> extra_cp_;
+
+  // Just for testing
+  mutable double def_max, def_sum;
 
   // Caching
   mutable double last_resolution_;

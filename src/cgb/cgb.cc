@@ -1,7 +1,11 @@
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <iostream>
+#include <map>
 #include <numeric>
 #include <sstream>
+#include <stack>
 
 #include <harmonic.h>
 
@@ -26,7 +30,8 @@ namespace CGB {
 
 ConcaveGB::ConcaveGB() :
   param_levels_(9), central_weight_(CentralWeight::ZERO), domain_tolerance_(0.2),
-  parameter_dilation_(0.0), central_cp_(0, 0, 0), last_resolution_(std::nan(""))
+  parameter_dilation_(0.0), use_biharmonic_(false), fill_concave_corners_(false),
+  central_cp_(0, 0, 0), last_resolution_(std::nan(""))
 {
 }
 
@@ -57,8 +62,18 @@ ConcaveGB::setParameterDilation(double dilation) {
 }
 
 void
+ConcaveGB::setBiharmonic(bool biharmonic) {
+  use_biharmonic_ = biharmonic;
+}
+
+void
 ConcaveGB::setCentralControlPoint(const Point3D &p) {
   central_cp_ = p;
+}
+
+void
+ConcaveGB::setFillConcaveCorners(bool fill_concave) {
+  fill_concave_corners_ = fill_concave;
 }
 
 bool
@@ -76,7 +91,7 @@ ConcaveGB::loadOptions(std::istream &is) {
   unsigned int cw;
   is >> cw >> domain_tolerance_ >> parameter_dilation_;
 
-  if (cw > 3 || domain_tolerance_ < 0 || parameter_dilation_ < 0)
+  if (cw > 3 || parameter_dilation_ < 0)
     return false;
 
   central_weight_ = static_cast<CentralWeight>(cw);
@@ -106,6 +121,14 @@ ConcaveGB::loadControlPoints(std::istream &is, bool generate_domain) {
       r.push_back(std::move(one_row));
     }
     ribbons_.push_back(std::move(r));
+  }
+
+  size_t j, k;
+  is >> k;
+  extra_cp_.clear(); extra_cp_.reserve(k);
+  for (size_t i = 0; i < k; ++i) {
+    is >> j >> p[0] >> p[1] >> p[2];
+    extra_cp_.push_back({j, p});
   }
   
   if (generate_domain && is.good())
@@ -336,12 +359,12 @@ ConcaveGB::generateSimilarityDomain() const {
     angles.push_back(alpha);
   }
 
-  if (!normalizeSmallerAngles(angles))
+  if (domain_tolerance_ < 0 || !normalizeSmallerAngles(angles))
     normalizeInnerAngles(angles);
 
   domain = generateAngleLengthDomain(angles, lengths);
 
-  while (!isDomainValid(domain, domain_tolerance_)) {
+  while (!isDomainValid(domain, std::abs(domain_tolerance_))) {
     enlargeDomainAngles(angles);
     domain = generateAngleLengthDomain(angles, lengths);
   }
@@ -374,10 +397,25 @@ ConcaveGB::generateDomain() {
   param_cache_.clear();
   mesh_cache_.clear();
 
-  if (domain_tolerance_ > 0)
-    domain_ = generateSimilarityDomain();
-  else
+  if (domain_tolerance_ == 0.0)
     domain_ = generateProjectedDomain();
+  else
+    domain_ = generateSimilarityDomain();
+
+  {
+    auto scale = [](Point2D p) {
+      return (p + Point2D(1,1)) * 250 + Point2D(50,50);
+    };
+    std::ofstream f("domain.eps");
+    f << "newpath\n";
+    auto q = scale(domain_.back());
+    f << q[0] << ' ' << q[1] << " moveto\n";
+    for (const auto &p : domain_) {
+      auto q = scale(p);
+      f << q[0] << ' ' << q[1] << " lineto\n";
+    }
+    f << "stroke\nshowpage" << std::endl;
+  }
 
   // Setup parameterization
   size_t n = ribbons_.size();
@@ -389,7 +427,7 @@ ConcaveGB::generateDomain() {
   }
   for (size_t i = 0; i < n; ++i) {
     points[3*i+2] = 1;
-    auto map = harmonic_init(n, &points[0], param_levels_, EPSILON);
+    auto map = harmonic_init(n, &points[0], param_levels_, EPSILON, use_biharmonic_);
     parameters_.push_back(map);
     points[3*i+2] = 0;
   }
@@ -414,27 +452,6 @@ namespace {
     }
   }
 
-  // Returns the index of the segment closest to p.
-  // An edge is defined by vertices i-1 and i.
-  // (This computes the distances from _lines_, not segments.)
-  size_t
-  closestEdge(const Point2DVector &points, const Point2D &p) {
-    size_t n = points.size();
-    size_t result = 0;
-    double min = -1;
-    for (size_t i = 0; i < n; ++i) {
-      size_t im = (i + n - 1) % n;
-      Vector2D dev = p - points[im];
-      Vector2D dir = (points[i] - points[im]).normalize();
-      double dist = (dev - dir * (dev * dir)).norm();
-      if (min < 0 || dist < min) {
-        min = dist;
-        result = i;
-      }
-    }
-    return result;
-  }
-
   // Returns the (s,d) system for side i, given the barycentric coordinates bc.
   Point2D
   barycentricSD(const DoubleVector &bc, size_t i, double dilation) {
@@ -449,34 +466,32 @@ namespace {
     return Point2D(s, d);
   }
 
-  // Returns mu^i_{j,k}, given the local coordinates sds (side i, row k, column j).
+  // Returns mu^i_j, given the local coordinates sds (side i, column j).
   double
-  weight(size_t d, const Point2DVector &sds, size_t i, size_t j, size_t k) {
-    size_t n = sds.size();
-    double mu = 1.0;
-    if (k < 2 && j < 2) {
-      // alpha
+  weight(size_t d, const Point2DVector &sds, size_t i, size_t j) {
+    if (j < 2) {
+      size_t n = sds.size();
+      double alpha = 0.5;
       size_t im = (i + n - 1) % n;
-      double di2 = std::pow(sds[i][1], 2), dim2 = std::pow(sds[im][1], 2);
+      double di2 = std::pow(sds[i][1], 2);
+      double dim2 = std::pow(sds[im][1], 2);
       double denom = dim2 + di2;
-      if (denom < EPSILON)
-        mu = 0.5;
-      else
-        mu = dim2 / denom;
-    } else if (k < 2 && j > d - 2) {
-      // beta
+      if (denom > EPSILON)
+        alpha = dim2 / denom;
+      return alpha;
+    }
+    if (j > d - 2) {
+      size_t n = sds.size();
+      double beta = 0.5;
       size_t ip = (i + 1) % n;
-      double di2 = std::pow(sds[i][1], 2), dip2 = std::pow(sds[ip][1], 2);
+      double di2 = std::pow(sds[i][1], 2);
+      double dip2 = std::pow(sds[ip][1], 2);
       double denom = dip2 + di2;
-      if (denom < EPSILON)
-        mu = 0.5;
-      else
-        mu = dip2 / denom;
-    } else if (j < k || j > d - k)
-      mu = 0.0;
-    else if (j == k || j == d - k)
-      mu = 0.5;
-    return mu;
+      if (denom > EPSILON)
+        beta = dip2 / denom;
+      return beta;
+    }
+    return 1.0;
   }
 
 }
@@ -484,19 +499,23 @@ namespace {
 // Returns the barycentric coordinates for an (u,v) point in the domain.
 DoubleVector
 ConcaveGB::localCoordinates(const Point2D &uv) const {
-  size_t n = parameters_.size();
+  size_t n = parameters_.size(), small = 0;
   DoubleVector result(n, 0.0);
   for (size_t i = 0; i < n; ++i) {
-    double value;
-    if (!harmonic_eval(parameters_[i], const_cast<double *>(uv.data()), &value)) {
-      // linear interpolation
-      size_t k = closestEdge(domain_, uv), km = (k + n - 1) % n;
-      double x = (uv - domain_[km]).norm() / (domain_[k] - domain_[km]).norm();
-      result[km] = 1 - x;
-      result[k] = x;
-      return result;
-    }
-    result[i] = value;
+    harmonic_eval(parameters_[i], const_cast<double *>(uv.data()), &result[i]);
+    if (result[i] < EPSILON)
+      ++small;
+  }
+  if (small == n - 2) {
+    size_t i = 0;
+    while (result[++i] < EPSILON);
+    if (i == 1 && result[0] >= EPSILON)
+      i = 0;
+    size_t ip = (i + 1) % n;
+    result = DoubleVector(n, 0.0);
+    double x = (uv - domain_[i]).norm() / (domain_[ip] - domain_[i]).norm();
+    result[i] = 1.0 - x;
+    result[ip] = x;
   }
   return result;
 }
@@ -561,21 +580,95 @@ ConcaveGB::generateDelaunayMesh(double resolution) const {
                             out.trianglelist[3*i+2]);
 }
 
-// Generates a new mesh cache using the harmonic library.
+namespace {
+
+  void floodFill(std::vector<bool> &grid, size_t n, size_t x, size_t y) {
+    using Coord = std::pair<size_t, size_t>;
+    std::stack<Coord> ps;
+    ps.push({x, y});
+    do {
+	  size_t x = ps.top().first, y = ps.top().second; // auto [x, y] = ps.top();
+      ps.pop();
+      if (grid[y*n+x])
+        continue;
+      grid[y*n+x] = true;
+      if (x > 0)     ps.push({x - 1, y});
+      if (x < n - 1) ps.push({x + 1, y});
+      if (y > 0)     ps.push({x,     y - 1});
+      if (y < n - 1) ps.push({x,     y + 1});
+    } while (!ps.empty());
+  }
+
+  // Generates a mesh using a discretization of the domain (using a bitmap of size 2^size).
+  // Assumes that domain is in [-1,1]x[-1,1].
+  TriMesh regularMesh(const Point2DVector &domain, size_t size) {
+    size_t n = (size_t)std::pow(2, size);
+    std::vector<bool> grid(n * n, false);
+    Point2D offset(-1.05, -1.05);
+    double scaling = n / 2.1;
+
+    // Init
+    Point2D p0 = (domain.back() - offset) * scaling;
+    int x0 = (int)p0[0], y0 = (int)p0[1];
+    for (const auto &p : domain) {
+      Point2D p1 = (p - offset) * scaling;
+      int x1 = (int)p1[0], y1 = (int)p1[1];
+      int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+      int dy = std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+      int err = (dx > dy ? dx : -dy) / 2, e2;
+      while (true) {
+        grid[y0*n+x0] = true;
+        if (x0 == x1 && y0 == y1)
+          break;
+        e2 = err;
+        if (e2 > -dx) { err -= dy; x0 += sx; }
+        if (e2 <  dy) { err += dx; y0 += sy; }
+      }
+    }
+    floodFill(grid, n, 0, 0);
+
+    // Build mesh
+    std::vector<size_t> row(n);
+    PointVector pv;
+    TriMesh result;
+    size_t index = 0;
+
+    for (size_t j = 1; j < n; ++j) {
+      for (size_t i = 0; i < n - 1; ++i) {
+        if (grid[j*n+i])
+          continue;
+
+        if (grid[(j-1)*n+i+1]) {
+          // no NE
+          if (!grid[(j-1)*n+i] && !grid[j*n+i+1])
+            result.addTriangle(index, row[i], index + 1);   // N & E
+        } else {
+          // NE
+          if (!grid[(j-1)*n+i])
+            result.addTriangle(index, row[i], row[i+1]);    // N & NE
+          if (!grid[j*n+i+1])
+            result.addTriangle(index, row[i+1], index + 1); // E & NE
+        }
+
+        pv.emplace_back((double)i / scaling + offset[0], (double)j / scaling + offset[1], 0.0);
+        row[i] = index++;
+      }
+    }
+
+    result.setPoints(pv);
+    return result;
+  }
+
+}
+
+// Generates a new mesh cache using a bitmap
 void
 ConcaveGB::generateRegularMesh(size_t downsampling) const {
-  size_t n_vertices = harmonic_mesh_size(parameters_[0], downsampling);
-  DoubleVector vertices(n_vertices * 2);
-  std::vector<size_t> triangles(n_vertices * 6);
-  size_t n_triangles = harmonic_mesh(parameters_[0], downsampling, &vertices[0], &triangles[0]);
+  mesh_cache_ = regularMesh(domain_, param_levels_ - downsampling);
   param_cache_.clear();
-  param_cache_.reserve(n_vertices);
-  for (size_t i = 0; i < n_vertices; ++i)
-    param_cache_.emplace_back(localCoordinates(Point2D(vertices[2*i], vertices[2*i+1])));
-  mesh_cache_.clear();
-  mesh_cache_.resizePoints(n_vertices);
-  for (size_t i = 0; i < n_triangles; ++i)
-    mesh_cache_.addTriangle(triangles[3*i+0], triangles[3*i+1], triangles[3*i+2]);
+  param_cache_.reserve(mesh_cache_.points().size());
+  for (const auto &p : mesh_cache_.points())
+    param_cache_.emplace_back(localCoordinates(Point2D(p[0], p[1])));
 }
 
 TriMesh
@@ -589,8 +682,16 @@ ConcaveGB::evaluate(double resolution) const {
   }
 
   // Evaluate based on the cached barycentric coordinates
+  def_max = 0; def_sum = 0;
   for (size_t i = 0, ie = param_cache_.size(); i != ie; ++i)
     mesh_cache_[i] = evaluate(param_cache_[i]);
+
+  {
+    std::ofstream f("deficiency.txt");
+    f << "Def. max: " << def_max << std::endl;
+    f << "Def. sum: " << def_sum << std::endl;
+  }
+
   return mesh_cache_;
 }
 
@@ -611,13 +712,35 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
     size_t l = ribbons_[side].size();
     size_t d = ribbons_[side][0].size() - 1;
     bernstein(d, sds[side][0], bl_s);
-    bernstein(d, sds[side][1], bl_d);
+    bernstein(2 * l - 1, sds[side][1], bl_d);
     for (size_t row = 0; row < l; ++row) {
       for (size_t col = 0; col <= d; ++col) {
-        double blend = bl_s[col] * bl_d[row] * weight(d, sds, side, col, row);
+        double blend = bl_s[col] * bl_d[row] * weight(d, sds, side, col);
         result += ribbons_[side][row][col] * blend;
         weight_sum += blend;
       }
+    }
+  }
+
+  if (fill_concave_corners_) {
+    for (const auto &ecp : extra_cp_) {
+      const size_t &i = ecp.i;
+      const Point3D &cp = ecp.p;
+      size_t ip = (i + 1) % n;
+      auto &r1 = ribbons_[i];
+      auto &r2 = ribbons_[ip];
+      size_t l1 = r1.size(), l2 = r2.size();
+      bernstein(2 * l1 - 1, sds[i][1], bl_s);
+      bernstein(2 * l2 - 1, sds[ip][1], bl_d);
+      double beta = 0.0;
+      double di2 = std::pow(sds[i][1], 2);
+      double dip2 = std::pow(sds[ip][1], 2);
+      double denom = dip2 + di2;
+      if (denom > EPSILON)
+        beta = dip2 / denom;
+      double blend = beta * (1.0 - beta) * 5.0 * bl_s[1] * bl_d[1];
+      result += cp * blend;
+      weight_sum += blend;
     }
   }
 
@@ -629,7 +752,14 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
   case CentralWeight::ZERO:
     break;
   case CentralWeight::NTH:
-    central_blend = (1.0 - weight_sum) / (double)n;
+    central_blend = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+      size_t ip = (i + 1) % n;
+      central_blend +=
+        std::pow(sds[i][1], 2) * std::pow(1.0 - sds[i][1], 2) *
+        std::pow(sds[ip][1], 2) * std::pow(1.0 - sds[ip][1], 2);
+    }
+    central_blend *= n;
     break;
   case CentralWeight::HARMONIC:
     central_blend = n;
@@ -637,6 +767,11 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
       central_blend *= std::pow(sds[i][1], 2);
     break;
   }
+
+  double def = 1.0 - (weight_sum + central_blend);
+  def_sum += def;
+  if (std::abs(def) > std::abs(def_max))
+    def_max = def;
 
   result += central_cp_ * central_blend;
   result /= weight_sum + central_blend;
