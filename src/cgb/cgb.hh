@@ -112,6 +112,12 @@ private:
   std::vector<HarmonicMap *> parameters_;
   std::vector<Ribbon> ribbons_;
 
+  struct ExtraCP {
+    size_t i;
+    Point3D p;
+  };
+  std::vector<ExtraCP> extra_cp_;
+
   // Just for testing
   mutable double def_max, def_sum;
 

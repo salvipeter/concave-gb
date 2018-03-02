@@ -122,6 +122,14 @@ ConcaveGB::loadControlPoints(std::istream &is, bool generate_domain) {
     }
     ribbons_.push_back(std::move(r));
   }
+
+  size_t j, k;
+  is >> k;
+  extra_cp_.clear(); extra_cp_.reserve(k);
+  for (size_t i = 0; i < k; ++i) {
+    is >> j >> p[0] >> p[1] >> p[2];
+    extra_cp_.push_back({j, p});
+  }
   
   if (generate_domain && is.good())
     generateDomain();
@@ -715,16 +723,13 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
   }
 
   if (fill_concave_corners_) {
-    for (size_t i = 0; i < n; ++i) {
+    for (const auto &ecp : extra_cp_) {
+      const size_t &i = ecp.i;
+      const Point3D &cp = ecp.p;
       size_t ip = (i + 1) % n;
       auto &r1 = ribbons_[i];
       auto &r2 = ribbons_[ip];
       size_t l1 = r1.size(), l2 = r2.size();
-      size_t d = r1[0].size() - 1;
-      auto v1 = (r1[0][d] - r1[0][d-1]).normalize();
-      if (v1 * (r2[1][0] - r2[0][0]) < 0)
-        continue;
-      Point3D cp = (r1[1][d] * 2 - r1[1][d-1] + r2[1][0] * 2 - r2[1][1]) / 2.0;
       bernstein(2 * l1 - 1, sds[i][1], bl_s);
       bernstein(2 * l2 - 1, sds[ip][1], bl_d);
       double beta = 0.0;
