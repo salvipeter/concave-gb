@@ -738,7 +738,7 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
       double denom = dip2 + di2;
       if (denom > EPSILON)
         beta = dip2 / denom;
-      double blend = beta * (1.0 - beta) * 5.0 * bl_s[1] * bl_d[1];
+      double blend = beta * (1.0 - beta) * 4.5 * bl_s[1] * bl_d[1];
       result += cp * blend;
       weight_sum += blend;
     }
@@ -762,7 +762,7 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
     central_blend *= n;
     break;
   case CentralWeight::HARMONIC:
-    central_blend = n;
+    central_blend = 2.0 / 9.0 / std::pow(1.0 - 2.0 / (double)n, 2 * n);
     for (size_t i = 0; i < n; ++i)
       central_blend *= std::pow(sds[i][1], 2);
     break;
