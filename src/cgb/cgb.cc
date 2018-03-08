@@ -469,7 +469,7 @@ namespace {
   // Returns mu^i_j, given the local coordinates sds (side i, column j).
   double
   weight(size_t d, const Point2DVector &sds, size_t i, size_t j) {
-    if (j < 2) {
+    if (2 * j < d) {
       size_t n = sds.size();
       double alpha = 0.5;
       size_t im = (i + n - 1) % n;
@@ -480,7 +480,7 @@ namespace {
         alpha = dim2 / denom;
       return alpha;
     }
-    if (j > d - 2) {
+    if (2 * j > d) {
       size_t n = sds.size();
       double beta = 0.5;
       size_t ip = (i + 1) % n;
