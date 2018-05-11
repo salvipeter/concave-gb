@@ -425,9 +425,14 @@ ConcaveGB::generateDomain() {
     points.push_back(p[1]);
     points.push_back(0);
   }
+  DoubleVector min = { -1, -1 }, max = { 1, 1 };
   for (size_t i = 0; i < n; ++i) {
     points[3*i+2] = 1;
-    auto map = harmonic_init(n, &points[0], param_levels_, EPSILON, use_biharmonic_);
+    auto map = harmonic_create(&min[0], &max[0], param_levels_);
+    harmonic_add_line(map, &points[3*n-3], &points[0]);
+    for (size_t j = 1; j < n; ++j)
+      harmonic_add_line(map, &points[3*j-3], &points[3*j]);
+    harmonic_solve(map, EPSILON, use_biharmonic_);
     parameters_.push_back(map);
     points[3*i+2] = 0;
   }
