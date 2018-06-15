@@ -31,6 +31,9 @@ public:
   // HARMONIC: computed from harmonic coordinates (and all weights are normalized)
   void setCentralWeight(CentralWeight type);
 
+  // Sets the weight of the parameterization of concave corners (default = 1)
+  void setConcaveWeight(double weight);
+
   // The given tolerance controls the minimum distance between non-adjacent segments.
   // Note that the domain is always normalized to the [-1,1]x[-1,1] square.
   // When set to 0, a simple least-squares projection is used.
@@ -103,12 +106,14 @@ private:
 
   size_t param_levels_;
   CentralWeight central_weight_;
+  double concave_weight_;
   double domain_tolerance_;
   double parameter_dilation_;
   bool use_biharmonic_;
   bool fill_concave_corners_;
   Point3D central_cp_;
   Point2DVector domain_;
+  std::vector<bool> concave_;
   std::vector<HarmonicMap *> parameters_;
   std::vector<Ribbon> ribbons_;
 

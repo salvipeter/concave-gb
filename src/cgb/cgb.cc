@@ -29,9 +29,9 @@ static const double EPSILON = 1.0e-5;
 namespace CGB {
 
 ConcaveGB::ConcaveGB() :
-  param_levels_(9), central_weight_(CentralWeight::ZERO), domain_tolerance_(0.2),
-  parameter_dilation_(0.0), use_biharmonic_(false), fill_concave_corners_(false),
-  central_cp_(0, 0, 0), last_resolution_(std::nan(""))
+  param_levels_(9), central_weight_(CentralWeight::ZERO), concave_weight_(0.0),
+  domain_tolerance_(0.2), parameter_dilation_(0.0), use_biharmonic_(false),
+  fill_concave_corners_(false), central_cp_(0, 0, 0), last_resolution_(std::nan(""))
 {
 }
 
@@ -49,6 +49,11 @@ ConcaveGB::setParamLevels(size_t levels) {
 void
 ConcaveGB::setCentralWeight(ConcaveGB::CentralWeight type) {
   central_weight_ = type;
+}
+
+void
+ConcaveGB::setConcaveWeight(double weight) {
+  concave_weight_ = weight;
 }
 
 void
@@ -417,8 +422,19 @@ ConcaveGB::generateDomain() {
     f << "stroke\nshowpage" << std::endl;
   }
 
-  // Setup parameterization
+  // Setup concaveness
   size_t n = ribbons_.size();
+  concave_.resize(n);
+  for (size_t i = 0; i < n; ++i) {
+    size_t ip = (i + 1) % n;
+    auto &r1 = ribbons_[i][0];
+    auto &r2 = ribbons_[ip][0];
+    size_t d = r1.size() - 1;
+    auto v1 = (r1[d] - r1[d-1]).normalize();
+    concave_[i] = v1 * (ribbons_[ip][1][0] - r2[0]) > 0;
+  }
+
+  // Setup parameterization
   DoubleVector points; points.reserve(3 * n);
   for (const auto &p : domain_) {
     points.push_back(p[0]);
@@ -511,7 +527,17 @@ ConcaveGB::localCoordinates(const Point2D &uv) const {
     if (result[i] < EPSILON)
       ++small;
   }
-  if (small == n - 2) {
+  if (concave_weight_ != 1.0) {
+    double sum = 1.0;
+    for (size_t i = 0; i < n; ++i)
+      if (concave_[i]) {
+        sum += result[i] * (concave_weight_ - 1.0);
+        result[i] *= concave_weight_;
+      }
+    for (size_t i = 0; i < n; ++i)
+      result[i] /= sum;
+  }
+  if (small == n - 2) {         // TODO: this is not correct when concave_weight_ != 1.0
     size_t i = 0;
     while (result[++i] < EPSILON);
     if (i == 1 && result[0] >= EPSILON)

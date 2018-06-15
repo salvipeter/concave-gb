@@ -6,7 +6,8 @@
 int main(int argc, char **argv) {
   if (argc < 3 || argc > 7) {
     std::cerr << "Usage: " << argv[0]
-              << " input.cgb output.obj [resolution] [levels] [biharmonic] [fill-concave]"
+              << " input.cgb output.obj"
+              << " [resolution] [levels] [biharmonic] [fill-concave] [concave-weight]"
               << std::endl;
     return 1;
   }
@@ -14,6 +15,7 @@ int main(int argc, char **argv) {
   CGB::ConcaveGB cgb;
 
   double resolution = 0.001;
+  double concave_weight = 1.0;
   
   if (argc > 3)
     resolution = std::stod(argv[3]);
@@ -37,6 +39,11 @@ int main(int argc, char **argv) {
       cgb.setFillConcaveCorners(true);
   }
 
+  if (argc > 7) {
+    concave_weight = std::stod(argv[7]);
+  }
+  cgb.setConcaveWeight(concave_weight);
+
 #ifdef DEBUG
   std::cout << "Compiled in DEBUG mode" << std::endl;
 #else
@@ -50,6 +57,7 @@ int main(int argc, char **argv) {
             << std::endl;
   std::cout << "Fill corners: " << (argc > 6 && std::string(argv[6]) == "true" ? "true" : "false")
             << std::endl;
+  std::cout << "Concave weight: " << concave_weight << std::endl;
 
   {
     std::ifstream f(argv[1]);
