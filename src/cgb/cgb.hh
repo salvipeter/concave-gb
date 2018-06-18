@@ -126,7 +126,8 @@ private:
   std::vector<ExtraCP> extra_cp_;
 
   // Just for testing
-  mutable double def_max, def_sum;
+  mutable double def;
+  mutable PointVector def_points;
 
   // Caching
   mutable double last_resolution_;

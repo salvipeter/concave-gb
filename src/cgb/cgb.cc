@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <map>
 #include <numeric>
@@ -623,9 +624,12 @@ ConcaveGB::generateDelaunayMesh(double resolution) const {
 
   // Process the result
   param_cache_.reserve(out.numberofpoints);
-  for (int i = 0; i < out.numberofpoints; ++i)
-    param_cache_.emplace_back(localCoordinates(Point2D(out.pointlist[2*i],
-                                                       out.pointlist[2*i+1])));
+  def_points.resize(out.numberofpoints);
+  for (int i = 0; i < out.numberofpoints; ++i) {
+    Point2D q(out.pointlist[2*i], out.pointlist[2*i+1]);
+    def_points[i][0] = q[0]; def_points[i][1] = q[1];
+    param_cache_.emplace_back(localCoordinates(q));
+  }
   mesh_cache_.resizePoints(param_cache_.size());
   for (int i = 0; i < out.numberoftriangles; ++i)
     mesh_cache_.addTriangle(out.trianglelist[3*i+0],
@@ -712,6 +716,41 @@ namespace {
     return result;
   }
 
+  void writeContours(std::ofstream &f, const std::function<Point2D(const Point2D &)> &scale,
+                     const TriMesh &mesh, const PointVector &points, double density) {
+    Point2DVector found;
+    auto slice = [&points, density, &found](size_t i, size_t j) {
+      double x = points[i][2], y = points[j][2];
+      if (y > x) {
+        std::swap(x, y);
+        std::swap(i, j);
+      }
+      int q1 = std::floor(x / density), q2 = std::floor(y / density);
+      if (q1 - q2 == 1 && q1 != 0) {
+        double alpha = (density * q1 - y) / (x - y);
+        Point3D q = points[j] * (1.0 - alpha) + points[i] * alpha;
+        found.emplace_back(q[0], q[1]);
+      }
+    };
+    using Segment = std::pair<Point2D, Point2D>;
+    std::vector<Segment> segments;
+    for (const auto &tri : mesh.triangles()) {
+      found.clear();
+      slice(tri[0], tri[1]);
+      slice(tri[0], tri[2]);
+      slice(tri[1], tri[2]);
+      if (found.size() == 2)
+        segments.emplace_back(found[0], found[1]);
+    }
+    for (const auto &s : segments) {
+      auto p = scale(s.first), q = scale(s.second);
+      f << "newpath\n"
+        << p[0] << ' ' << p[1] << " moveto\n"
+        << q[0] << ' ' << q[1] << " lineto\n"
+        << "stroke" << std::endl;
+    }
+  }
+
 }
 
 // Generates a new mesh cache using a bitmap
@@ -720,8 +759,12 @@ ConcaveGB::generateRegularMesh(size_t downsampling) const {
   mesh_cache_ = regularMesh(domain_, param_levels_ - downsampling);
   param_cache_.clear();
   param_cache_.reserve(mesh_cache_.points().size());
-  for (const auto &p : mesh_cache_.points())
+  def_points.clear();
+  def_points.reserve(mesh_cache_.points().size());
+  for (const auto &p : mesh_cache_.points()) {
+    def_points.push_back(p);
     param_cache_.emplace_back(localCoordinates(Point2D(p[0], p[1])));
+  }
 }
 
 TriMesh
@@ -735,9 +778,31 @@ ConcaveGB::evaluate(double resolution) const {
   }
 
   // Evaluate based on the cached barycentric coordinates
-  def_max = 0; def_sum = 0;
-  for (size_t i = 0, ie = param_cache_.size(); i != ie; ++i)
+  double def_max = 0.0, def_sum = 0.0;
+  for (size_t i = 0, ie = param_cache_.size(); i != ie; ++i) {
     mesh_cache_[i] = evaluate(param_cache_[i]);
+    def_points[i][2] = def;
+    def_sum += def;
+    if (std::abs(def) > std::abs(def_max))
+      def_max = def;
+  }
+
+  {
+    auto scale = [](Point2D p) {
+      return (p + Point2D(1,1)) * 250 + Point2D(50,50);
+    };
+    std::ofstream f("deficiency.eps");
+    f << "newpath\n";
+    auto q = scale(domain_.back());
+    f << q[0] << ' ' << q[1] << " moveto\n";
+    for (const auto &p : domain_) {
+      auto q = scale(p);
+      f << q[0] << ' ' << q[1] << " lineto\n";
+    }
+    f << "stroke" << std::endl;
+    writeContours(f, scale, mesh_cache_, def_points, 0.05);
+    f << "showpage" << std::endl;
+  }
 
   {
     std::ofstream f("deficiency.txt");
@@ -821,10 +886,7 @@ ConcaveGB::evaluate(const DoubleVector &bc) const {
     break;
   }
 
-  double def = 1.0 - (weight_sum + central_blend);
-  def_sum += def;
-  if (std::abs(def) > std::abs(def_max))
-    def_max = def;
+  def = 1.0 - (weight_sum + central_blend);
 
   result += central_cp_ * central_blend;
   result /= weight_sum + central_blend;
