@@ -725,7 +725,8 @@ namespace {
         std::swap(x, y);
         std::swap(i, j);
       }
-      int q1 = std::floor(x / density), q2 = std::floor(y / density);
+	  int q1 = static_cast<int>(std::floor(x / density));
+	  int q2 = static_cast<int>(std::floor(y / density));
       if (q1 - q2 == 1 && q1 != 0) {
         double alpha = (density * q1 - y) / (x - y);
         Point3D q = points[j] * (1.0 - alpha) + points[i] * alpha;
