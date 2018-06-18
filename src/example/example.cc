@@ -3,6 +3,10 @@
 
 #include "cgb.hh"
 
+#ifdef WIN32
+extern "C" { FILE __iob_func[3] = { *stdin, *stdout, *stderr }; } // GSL is compiled with an old VSs
+#endif
+
 int main(int argc, char **argv) {
   if (argc < 3 || argc > 8) {
     std::cerr << "Usage: " << argv[0]
