@@ -4,7 +4,7 @@
 #include "cgb.hh"
 
 int main(int argc, char **argv) {
-  if (argc < 3 || argc > 7) {
+  if (argc < 3 || argc > 8) {
     std::cerr << "Usage: " << argv[0]
               << " input.cgb output.obj"
               << " [resolution] [levels] [biharmonic] [fill-concave] [concave-weight]"
