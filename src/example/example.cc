@@ -7,7 +7,7 @@ int main(int argc, char **argv) {
   if (argc < 3 || argc > 8) {
     std::cerr << "Usage: " << argv[0]
               << " input.cgb output.obj"
-              << " [resolution] [levels] [biharmonic] [fill-concave] [concave-weight]"
+              << " [resolution] [levels] [maxent] [fill-concave] [concave-weight]"
               << std::endl;
     return 1;
   }
@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
 
   if (argc > 5) {
     if (std::string(argv[5]) == "true")
-      cgb.setBiharmonic(true);
+      cgb.setMaxEnt(true);
   }
 
   if (argc > 6) {
@@ -53,7 +53,7 @@ int main(int argc, char **argv) {
   std::cout << "Output: " << argv[2] << std::endl;
   std::cout << "Resolution: " << resolution << std::endl;
   std::cout << "Param. level: " << (argc > 4 ? argv[4] : "9") << std::endl;
-  std::cout << "Biharmonic: " << (argc > 5 && std::string(argv[5]) == "true" ? "true" : "false")
+  std::cout << "Max. entropy: " << (argc > 5 && std::string(argv[5]) == "true" ? "true" : "false")
             << std::endl;
   std::cout << "Fill corners: " << (argc > 6 && std::string(argv[6]) == "true" ? "true" : "false")
             << std::endl;

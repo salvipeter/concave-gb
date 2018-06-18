@@ -8,6 +8,9 @@
 #include <stack>
 
 #include <harmonic.h>
+extern "C" {
+#include <mec.h>
+}
 
 #include "lsq-plane.hh"
 
@@ -30,14 +33,17 @@ namespace CGB {
 
 ConcaveGB::ConcaveGB() :
   param_levels_(9), central_weight_(CentralWeight::ZERO), concave_weight_(0.0),
-  domain_tolerance_(0.2), parameter_dilation_(0.0), use_biharmonic_(false),
-  fill_concave_corners_(false), central_cp_(0, 0, 0), last_resolution_(std::nan(""))
+  domain_tolerance_(0.2), parameter_dilation_(0.0), use_maxent_(false),
+  fill_concave_corners_(false), central_cp_(0, 0, 0), mec_parameters_(nullptr),
+  last_resolution_(std::nan(""))
 {
 }
 
 ConcaveGB::~ConcaveGB() {
   for (auto p : parameters_)
     harmonic_free(p);
+  if (mec_parameters_)
+    mec_free(mec_parameters_);
 }
 
 
@@ -67,8 +73,8 @@ ConcaveGB::setParameterDilation(double dilation) {
 }
 
 void
-ConcaveGB::setBiharmonic(bool biharmonic) {
-  use_biharmonic_ = biharmonic;
+ConcaveGB::setMaxEnt(bool maxent) {
+  use_maxent_ = maxent;
 }
 
 void
@@ -398,6 +404,10 @@ ConcaveGB::generateDomain() {
   for (auto p : parameters_)
     harmonic_free(p);
   parameters_.clear();
+  if (mec_parameters_) {
+    mec_free(mec_parameters_);
+    mec_parameters_ = nullptr;
+  }
   last_resolution_ = std::nan("");
   param_cache_.clear();
   mesh_cache_.clear();
@@ -435,6 +445,15 @@ ConcaveGB::generateDomain() {
   }
 
   // Setup parameterization
+  if (use_maxent_) {
+    DoubleVector points; points.reserve(2 * n);
+    for (const auto &p : domain_) {
+      points.push_back(p[0]);
+      points.push_back(p[1]);
+    }
+    mec_parameters_ = mec_init(n, &points[0]);
+    return;
+  }
   DoubleVector points; points.reserve(3 * n);
   for (const auto &p : domain_) {
     points.push_back(p[0]);
@@ -448,7 +467,7 @@ ConcaveGB::generateDomain() {
     harmonic_add_line(map, &points[3*n-3], &points[0]);
     for (size_t j = 1; j < n; ++j)
       harmonic_add_line(map, &points[3*j-3], &points[3*j]);
-    harmonic_solve(map, EPSILON, use_biharmonic_);
+    harmonic_solve(map, EPSILON, false);
     parameters_.push_back(map);
     points[3*i+2] = 0;
   }
@@ -520,13 +539,16 @@ namespace {
 // Returns the barycentric coordinates for an (u,v) point in the domain.
 DoubleVector
 ConcaveGB::localCoordinates(const Point2D &uv) const {
-  size_t n = parameters_.size(), small = 0;
+  size_t n = domain_.size(), small = 0;
   DoubleVector result(n, 0.0);
-  for (size_t i = 0; i < n; ++i) {
-    harmonic_eval(parameters_[i], const_cast<double *>(uv.data()), &result[i]);
+  if (use_maxent_)
+    mec_eval(mec_parameters_, uv.data(), &result[0]);
+  else
+    for (size_t i = 0; i < n; ++i)
+      harmonic_eval(parameters_[i], const_cast<double *>(uv.data()), &result[i]);
+  for (size_t i = 0; i < n; ++i)
     if (result[i] < EPSILON)
       ++small;
-  }
   if (concave_weight_ != 1.0) {
     double sum = 1.0;
     for (size_t i = 0; i < n; ++i)

@@ -16,4 +16,5 @@ set_source_files_properties(
 target_link_libraries(cgb
   ${LIBGEOM_LIBRARIES}
   ${LIBHARMONIC_LIBRARIES}
+  ${LIBMEC_LIBRARIES}
   )
