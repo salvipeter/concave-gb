@@ -546,7 +546,7 @@ ConcaveGB::localCoordinates(const Point2D &uv) const {
     mec_eval(mec_parameters_, uv.data(), &result[0]);
   else
     for (size_t i = 0; i < n; ++i)
-      harmonic_eval(parameters_[i], const_cast<double *>(uv.data()), &result[i]);
+      harmonic_eval(parameters_[i], uv.data(), &result[i]);
   for (size_t i = 0; i < n; ++i)
     if (result[i] < EPSILON)
       ++small;
