@@ -591,10 +591,10 @@ ConcaveGB::generateDelaunayMesh(double resolution) const {
   // Input segments : just a closed polygon
   std::vector<int> segments; segments.reserve(2 * n);
   for (size_t i = 0; i < n; ++i) {
-    segments[2*i]   = i;
-    segments[2*i+1] = i + 1;
+    segments.push_back(i);
+    segments.push_back(i + 1);
   }
-  segments[2*n-1] = 0;
+  segments.back() = 0;
     
   // Setup output data structure
   struct triangulateio in, out;
