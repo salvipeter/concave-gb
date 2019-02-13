@@ -34,9 +34,9 @@ namespace CGB {
 
 ConcaveGB::ConcaveGB() :
   param_levels_(9), central_weight_(CentralWeight::ZERO), concave_weight_(0.0),
-  domain_tolerance_(0.2), parameter_dilation_(0.0), use_maxent_(false),
-  fill_concave_corners_(false), central_cp_(0, 0, 0), mec_parameters_(nullptr),
-  last_resolution_(std::nan(""))
+  domain_type_(DomainType::PROJECTION), domain_tolerance_(0.2), parameter_dilation_(0.0),
+  use_maxent_(false), fill_concave_corners_(false), central_cp_(0, 0, 0), mec_parameters_(nullptr),
+  last_mesh_size_(std::nan(""))
 {
 }
 
@@ -100,13 +100,12 @@ ConcaveGB::setRibbons(const std::vector<Ribbon> &ribbons, bool generate_domain) 
 
 bool
 ConcaveGB::loadOptions(std::istream &is) {
-  unsigned int cw;
-  is >> cw >> domain_tolerance_ >> parameter_dilation_;
-
-  if (cw > 3 || parameter_dilation_ < 0)
-    return false;
+  unsigned int cw, dt;
+  double parameter_dilation_;
+  is >> cw >> dt >> domain_tolerance_ >> parameter_dilation_;
 
   central_weight_ = static_cast<CentralWeight>(cw);
+  domain_type_ = static_cast<DomainType>(dt);
 
   return is.good();
 }
@@ -371,12 +370,12 @@ ConcaveGB::generateSimilarityDomain() const {
     angles.push_back(alpha);
   }
 
-  if (domain_tolerance_ < 0 || !normalizeSmallerAngles(angles))
+  if (domain_type_ == DomainType::NORMAL || !normalizeSmallerAngles(angles))
     normalizeInnerAngles(angles);
 
   domain = generateAngleLengthDomain(angles, lengths);
 
-  while (!isDomainValid(domain, std::abs(domain_tolerance_))) {
+  while (!isDomainValid(domain, domain_tolerance_)) {
     enlargeDomainAngles(angles);
     domain = generateAngleLengthDomain(angles, lengths);
   }
@@ -409,14 +408,16 @@ ConcaveGB::generateDomain() {
     mec_free(mec_parameters_);
     mec_parameters_ = nullptr;
   }
-  last_resolution_ = std::nan("");
+  last_mesh_size_ = std::nan("");
   param_cache_.clear();
   mesh_cache_.clear();
 
-  if (domain_tolerance_ == 0.0)
+  if (domain_type_ == DomainType::PROJECTION)
     domain_ = generateProjectedDomain();
-  else
+  else if (domain_type_ == DomainType::NORMAL || domain_type_ == DomainType::CORRECTED)
     domain_ = generateSimilarityDomain();
+  else // DomainType::CURVED
+    ;
 
   {
     auto scale = [](Point2D p) {
@@ -770,14 +771,26 @@ ConcaveGB::generateRegularMesh(size_t downsampling) const {
 
 TriMesh
 ConcaveGB::evaluate(double resolution) const {
-  if (last_resolution_ != resolution) {
-    if (resolution > 0)
-      generateDelaunayMesh(resolution);
-    else
-      generateRegularMesh((size_t)-resolution);
-    last_resolution_ = resolution;
+  if (last_regular_ && last_mesh_size_ != resolution) {
+    generateDelaunayMesh(resolution);
+    last_regular_ = false;
+    last_mesh_size_ = resolution;
   }
+  return evaluateImpl();
+}
 
+TriMesh
+ConcaveGB::evaluateRegular(size_t downsampling) const {
+  if (!last_regular_ && last_mesh_size_ != downsampling) {
+    generateRegularMesh(downsampling);
+    last_regular_ = true;
+    last_mesh_size_ = downsampling;
+  }
+  return evaluateImpl();
+}
+
+TriMesh
+ConcaveGB::evaluateImpl() const {
   // Evaluate based on the cached barycentric coordinates
   double def_max = 0.0, def_sum = 0.0;
   for (size_t i = 0, ie = param_cache_.size(); i != ie; ++i) {

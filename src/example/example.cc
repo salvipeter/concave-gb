@@ -71,7 +71,10 @@ int main(int argc, char **argv) {
     }
   }
 
-  cgb.evaluate(resolution).writeOBJ(argv[2]);
+  if (resolution > 0)
+    cgb.evaluate(resolution).writeOBJ(argv[2]);
+  else
+    cgb.evaluateRegular(-resolution).writeOBJ(argv[2]);
 
   return 0;
 }

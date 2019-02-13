@@ -15,6 +15,7 @@ using namespace Geometry;
 class ConcaveGB {
 public:
   enum class CentralWeight { ORIGINAL = 0, ZERO = 1, NTH = 2, HARMONIC = 3 };
+  enum class DomainType { PROJECTION = 0, NORMAL = 1, CORRECTED = 2, CURVED = 3 };
   using Ribbon = std::vector<PointVector>; // (degree + 1) * layer
 
   ConcaveGB();
@@ -35,9 +36,15 @@ public:
   // Sets the weight of the parameterization of concave corners (default = 1)
   void setConcaveWeight(double weight);
 
+  // Sets the type of domain.
+  // PROJECTION: a simple projection of the vertices into a best-fit plane
+  // NORMAL: length-angle based (as in the paper)
+  // CORRECTED: same, but using outer angles for the obtuse angles (when possible)
+  // CURVED: curved domain
+  void setDomainType(DomainType type);
+
   // The given tolerance controls the minimum distance between non-adjacent segments.
   // Note that the domain is always normalized to the [-1,1]x[-1,1] square.
-  // When set to 0, a simple least-squares projection is used.
   void setDomainTolerance(double tolerance);
 
   // Alternative parameterization - positive values result in smaller weight deficiency.
@@ -59,6 +66,7 @@ public:
 
   // Reads model-specific options. The file format is the following:
   //   central_weight (as an integer)
+  //   domain_type
   //   domain_tolerance
   //   parameter_dilation
   bool loadOptions(std::istream &is);
@@ -89,13 +97,15 @@ public:
   // Evaluates the surface at a given resolution, resulting in a triangle mesh.
   // If the resolution did not change since the last call,
   // cached parameters and mesh topology are used.
-  // If the resolution is positive, it gives the maximal area of a triangle in the domain.
+  // Resolution gives the maximal area of a triangle in the domain.
   // Since the domain is always in [-1,1]x[-1,1], usual values range betwen 1e-5 and 1e-3.
-  // If the resolution is negative, a bitmap-based triangulation is used,
-  // where the resolution means downsampling from the ParamLevels resolution.
-  // So e.g. ParamLevels = 9 (the default) is a 2^9=512x512 bitmap,
-  // with resolution = -2 the triangulation will use a 2^(9-2)=2^7=128x128 bitmap.
   TriMesh evaluate(double resolution) const;
+
+  // Same as evaluate(), but a bitmap-based triangulation is used,
+  // where the downsampling means the sampling rate from the ParamLevels resolution.
+  // So e.g. ParamLevels = 9 (the default) is a 2^9=512x512 bitmap,
+  // with resolution = 2 the triangulation will use a 2^(9-2)=2^7=128x128 bitmap.
+  TriMesh evaluateRegular(size_t downsampling) const;
 
 private:
   Point2DVector generateSimilarityDomain() const;
@@ -104,10 +114,12 @@ private:
   void generateRegularMesh(size_t downsampling) const;
   DoubleVector localCoordinates(const Point2D &uv) const;
   Point3D evaluate(const DoubleVector &bc) const;
+  TriMesh evaluateImpl() const;
 
   size_t param_levels_;
   CentralWeight central_weight_;
   double concave_weight_;
+  DomainType domain_type_;
   double domain_tolerance_;
   double parameter_dilation_;
   bool use_maxent_;
@@ -130,7 +142,8 @@ private:
   mutable PointVector def_points;
 
   // Caching
-  mutable double last_resolution_;
+  mutable double last_mesh_size_;
+  mutable bool last_regular_;
   mutable std::vector<DoubleVector> param_cache_;
   mutable TriMesh mesh_cache_;
 };
