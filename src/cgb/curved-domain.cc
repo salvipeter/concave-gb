@@ -22,7 +22,7 @@ static void scalePoints(Point2DVector &points) {
   }
 }
 
-CurvedDomain::CurvedDomain(const std::vector<ConcaveGB::Ribbon> &ribbons, size_t levels) {
+CurvedDomain::CurvedDomain(const std::vector<ConcaveGB::Ribbon> &ribbons) {
   PointVector pv;
   for (const auto &r : ribbons) {
     const auto &cp = r.front();
@@ -41,8 +41,11 @@ CurvedDomain::CurvedDomain(const std::vector<ConcaveGB::Ribbon> &ribbons, size_t
       cp.push_back(projected[++index]);
     plane_curves_.push_back(cp);
   }
+}
 
-  harmonic_ = std::make_unique<Harmonic>(plane_curves_, levels);
+std::unique_ptr<Harmonic>
+CurvedDomain::init(size_t levels) const {
+  return std::make_unique<Harmonic>(plane_curves_, levels);
 }
 
 Point2DVector
@@ -54,11 +57,6 @@ CurvedDomain::polyline(size_t resolution) const {
       result.push_back(bezierEval(c, u));
     }
   return result;
-}
-
-DoubleVector
-CurvedDomain::harmonic(const Point2D &p) const {
-  return harmonic_->eval(p);
 }
 
 }

@@ -8,7 +8,6 @@
 #include <sstream>
 #include <stack>
 
-#include <harmonic.h>
 extern "C" {
 #include <mec.h>
 }
@@ -43,8 +42,6 @@ ConcaveGB::ConcaveGB() :
 }
 
 ConcaveGB::~ConcaveGB() {
-  for (auto p : parameters_)
-    harmonic_free(p);
   if (mec_parameters_)
     mec_free(mec_parameters_);
 }
@@ -403,9 +400,6 @@ void
 ConcaveGB::generateDomain() {
   // Invalidate everything
   domain_.clear();
-  for (auto p : parameters_)
-    harmonic_free(p);
-  parameters_.clear();
   if (mec_parameters_) {
     mec_free(mec_parameters_);
     mec_parameters_ = nullptr;
@@ -419,8 +413,9 @@ ConcaveGB::generateDomain() {
   else if (domain_type_ == DomainType::NORMAL || domain_type_ == DomainType::CORRECTED)
     domain_ = generateSimilarityDomain();
   else { // DomainType::CURVED
-    curved_domain_ = std::make_unique<CurvedDomain>(ribbons_, param_levels_);
+    curved_domain_ = std::make_unique<CurvedDomain>(ribbons_);
     domain_ = curved_domain_->polyline(1 << param_levels_);
+    parameters_ = curved_domain_->init(param_levels_);
     size_t n = ribbons_.size();
     concave_.resize(n);
     std::fill(concave_.begin(), concave_.end(), false); // everything is treated convex
@@ -466,23 +461,11 @@ ConcaveGB::generateDomain() {
     mec_parameters_ = mec_init(n, &points[0]);
     return;
   }
-  DoubleVector points; points.reserve(3 * n);
-  for (const auto &p : domain_) {
-    points.push_back(p[0]);
-    points.push_back(p[1]);
-    points.push_back(0);
-  }
-  DoubleVector min = { -1, -1 }, max = { 1, 1 };
-  for (size_t i = 0; i < n; ++i) {
-    points[3*i+2] = 1;
-    auto map = harmonic_create(&min[0], &max[0], param_levels_);
-    harmonic_add_line(map, &points[3*n-3], &points[0]);
-    for (size_t j = 1; j < n; ++j)
-      harmonic_add_line(map, &points[3*j-3], &points[3*j]);
-    harmonic_solve(map, EPSILON, false);
-    parameters_.push_back(map);
-    points[3*i+2] = 0;
-  }
+  std::vector<Point2DVector> lines;
+  lines.push_back({ domain_.back(), domain_.front() });
+  for (size_t i = 1; i < n; ++i)
+    lines.push_back({ domain_[i-1], domain_[i] });
+  parameters_ = std::make_unique<Harmonic>(lines, param_levels_);
 }
 
 namespace {
@@ -552,14 +535,13 @@ namespace {
 DoubleVector
 ConcaveGB::localCoordinates(const Point2D &uv) const {
   size_t n = ribbons_.size(), small = 0;
-  DoubleVector result(n, 0.0);
-  if (domain_type_ == DomainType::CURVED)
-    result = curved_domain_->harmonic(uv);
-  else if (use_maxent_)
+  DoubleVector result;
+  if (use_maxent_) {
+    result.resize(n);
     mec_eval(mec_parameters_, uv.data(), &result[0]);
-  else
+  } else
     for (size_t i = 0; i < n; ++i)
-      harmonic_eval(parameters_[i], uv.data(), &result[i]);
+      result = parameters_->eval(uv);
   for (size_t i = 0; i < n; ++i)
     if (result[i] < EPSILON)
       ++small;

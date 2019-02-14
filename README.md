@@ -9,7 +9,6 @@ The program was tested under Linux and Windows.
 You will need the following libraries:
 
 - libgeom, which is part of the [transfinite](https://bitbucket.org/salvipeter/transfinite) library
-- [libharmonic](https://github.com/salvipeter/harmonic)
 - [libmec](https://bitbucket.org/salvipeter/libmec)
 - Shewchuk's [Triangle](http://www.cs.cmu.edu/%7Equake/triangle.html)
 - [Eigen](https://eigen.tuxfamily.org/)
@@ -24,7 +23,6 @@ Note that you have to build Triangle as a library with the `-fpic` flag.
 > mkdir build
 > cd build
 > cmake -D LIBGEOM_ROOT=/your/path/to/transfinite \
-        -D LIBHARMONIC_ROOT=/your/path/to/harmonic \
         -D LIBMEC_ROOT=/your/path/to/libmec \
 		-D LIBTRIANGLE_ROOT=/your/path/to/triangle \
 		-D CMAKE_BUILD_TYPE=Debug # or Release \
@@ -34,7 +32,7 @@ Note that you have to build Triangle as a library with the `-fpic` flag.
 
 ### Building under Windows ###
 
-Download the dependencies into `dependencies/{transfinite,harmonic,libmec,triangle,eigen}`. (Note that you will need [GSL](https://www.gnu.org/software/gsl/) for compiling `libmec`.)
+Download the dependencies into `dependencies/{transfinite,libmec,triangle,eigen}`. (Note that you will need [GSL](https://www.gnu.org/software/gsl/) for compiling `libmec`.)
 A Visual Studio 2015 solution file is supplied for compilation.
 
 ## Usage ##

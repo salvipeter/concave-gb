@@ -5,12 +5,12 @@
 
 #include <geometry.hh>
 
-struct HarmonicMap;
 struct mec_t;
 
 namespace CGB {
 
 class CurvedDomain;
+class Harmonic;
 
 using namespace Geometry;
 
@@ -128,7 +128,7 @@ private:
   Point2DVector domain_;
   std::unique_ptr<CurvedDomain> curved_domain_;
   std::vector<bool> concave_;
-  std::vector<HarmonicMap *> parameters_;
+  std::unique_ptr<Harmonic> parameters_;
   mec_t *mec_parameters_;
   std::vector<Ribbon> ribbons_;
 
