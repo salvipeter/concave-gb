@@ -659,10 +659,10 @@ namespace {
     double scaling = n / 1.1;
 
     // Init
-    Point2D p0 = (domain.back() - offset) * scaling;
+    Point2D p0 = (domain.back() + offset) * scaling;
     int x0 = (int)p0[0], y0 = (int)p0[1];
     for (const auto &p : domain) {
-      Point2D p1 = (p - offset) * scaling;
+      Point2D p1 = (p + offset) * scaling;
       int x1 = (int)p1[0], y1 = (int)p1[1];
       int dx = std::abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
       int dy = std::abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
@@ -701,7 +701,7 @@ namespace {
             result.addTriangle(index, row[i+1], index + 1); // E & NE
         }
 
-        pv.emplace_back((double)i / scaling + offset[0], (double)j / scaling + offset[1], 0.0);
+        pv.emplace_back((double)i / scaling - offset[0], (double)j / scaling - offset[1], 0.0);
         row[i] = index++;
       }
     }
