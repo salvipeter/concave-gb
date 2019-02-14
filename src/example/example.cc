@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
   if (resolution > 0)
     cgb.evaluate(resolution).writeOBJ(argv[2]);
   else
-    cgb.evaluateRegular(levels + resolution).writeOBJ(argv[2]);
+    cgb.evaluateRegular(levels - (size_t)std::abs(resolution)).writeOBJ(argv[2]);
 
   return 0;
 }
