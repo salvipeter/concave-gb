@@ -764,7 +764,7 @@ ConcaveGB::generateRegularMesh(size_t resolution) const {
 
 TriMesh
 ConcaveGB::evaluate(double resolution) const {
-  if (last_regular_ && last_mesh_size_ != resolution) {
+  if (last_regular_ || last_mesh_size_ != resolution) {
     generateDelaunayMesh(resolution);
     last_regular_ = false;
     last_mesh_size_ = resolution;
@@ -774,7 +774,7 @@ ConcaveGB::evaluate(double resolution) const {
 
 TriMesh
 ConcaveGB::evaluateRegular(size_t resolution) const {
-  if (!last_regular_ && last_mesh_size_ != resolution) {
+  if (!last_regular_ || last_mesh_size_ != resolution) {
     generateRegularMesh(resolution);
     last_regular_ = true;
     last_mesh_size_ = resolution;
