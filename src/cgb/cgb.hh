@@ -10,6 +10,8 @@ struct mec_t;
 
 namespace CGB {
 
+class CurvedDomain;
+
 using namespace Geometry;
 
 class ConcaveGB {
@@ -102,10 +104,8 @@ public:
   TriMesh evaluate(double resolution) const;
 
   // Same as evaluate(), but a bitmap-based triangulation is used,
-  // where the downsampling means the sampling rate from the ParamLevels resolution.
-  // So e.g. ParamLevels = 9 (the default) is a 2^9=512x512 bitmap,
-  // with resolution = 2 the triangulation will use a 2^(9-2)=2^7=128x128 bitmap.
-  TriMesh evaluateRegular(size_t downsampling) const;
+  // where the triangulation uses a 2^resolution x 2^resolution bitmap.
+  TriMesh evaluateRegular(size_t resolution) const;
 
 private:
   Point2DVector generateSimilarityDomain() const;
@@ -126,6 +126,7 @@ private:
   bool fill_concave_corners_;
   Point3D central_cp_;
   Point2DVector domain_;
+  std::unique_ptr<CurvedDomain> curved_domain_;
   std::vector<bool> concave_;
   std::vector<HarmonicMap *> parameters_;
   mec_t *mec_parameters_;

@@ -13,6 +13,8 @@ extern "C" {
 #include <mec.h>
 }
 
+#include "curved-domain.hh"
+#include "harmonic.hh"
 #include "lsq-plane.hh"
 
 #define ANSI_DECLARATORS
@@ -416,8 +418,13 @@ ConcaveGB::generateDomain() {
     domain_ = generateProjectedDomain();
   else if (domain_type_ == DomainType::NORMAL || domain_type_ == DomainType::CORRECTED)
     domain_ = generateSimilarityDomain();
-  else // DomainType::CURVED
-    ;
+  else { // DomainType::CURVED
+    curved_domain_ = std::make_unique<CurvedDomain>(ribbons_, param_levels_);
+    domain_ = curved_domain_->polyline(1 << param_levels_);
+    size_t n = ribbons_.size();
+    concave_.resize(n);
+    std::fill(concave_.begin(), concave_.end(), false); // everything is treated convex
+  }
 
   {
     auto scale = [](Point2D p) {
@@ -433,6 +440,9 @@ ConcaveGB::generateDomain() {
     }
     f << "stroke\nshowpage" << std::endl;
   }
+
+  if (domain_type_ == DomainType::CURVED)
+    return;
 
   // Setup concaveness
   size_t n = ribbons_.size();
@@ -541,9 +551,11 @@ namespace {
 // Returns the barycentric coordinates for an (u,v) point in the domain.
 DoubleVector
 ConcaveGB::localCoordinates(const Point2D &uv) const {
-  size_t n = domain_.size(), small = 0;
+  size_t n = ribbons_.size(), small = 0;
   DoubleVector result(n, 0.0);
-  if (use_maxent_)
+  if (domain_type_ == DomainType::CURVED)
+    result = curved_domain_->harmonic(uv);
+  else if (use_maxent_)
     mec_eval(mec_parameters_, uv.data(), &result[0]);
   else
     for (size_t i = 0; i < n; ++i)
@@ -757,8 +769,8 @@ namespace {
 
 // Generates a new mesh cache using a bitmap
 void
-ConcaveGB::generateRegularMesh(size_t downsampling) const {
-  mesh_cache_ = regularMesh(domain_, param_levels_ - downsampling);
+ConcaveGB::generateRegularMesh(size_t resolution) const {
+  mesh_cache_ = regularMesh(domain_, resolution);
   param_cache_.clear();
   param_cache_.reserve(mesh_cache_.points().size());
   def_points.clear();
@@ -780,11 +792,11 @@ ConcaveGB::evaluate(double resolution) const {
 }
 
 TriMesh
-ConcaveGB::evaluateRegular(size_t downsampling) const {
-  if (!last_regular_ && last_mesh_size_ != downsampling) {
-    generateRegularMesh(downsampling);
+ConcaveGB::evaluateRegular(size_t resolution) const {
+  if (!last_regular_ && last_mesh_size_ != resolution) {
+    generateRegularMesh(resolution);
     last_regular_ = true;
-    last_mesh_size_ = downsampling;
+    last_mesh_size_ = resolution;
   }
   return evaluateImpl();
 }

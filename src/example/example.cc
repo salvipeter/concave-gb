@@ -20,12 +20,13 @@ int main(int argc, char **argv) {
 
   double resolution = 0.001;
   double concave_weight = 1.0;
+  unsigned int levels = 9;
   
   if (argc > 3)
     resolution = std::stod(argv[3]);
 
   if (argc > 4) {
-    unsigned int levels = std::stoi(argv[4]);
+    levels = std::stoi(argv[4]);
     if (levels <= 0) {
       std::cerr << "Parameterization level should be positive." << std::endl;
       return 1;
@@ -56,7 +57,7 @@ int main(int argc, char **argv) {
   std::cout << "Input: " << argv[1] << std::endl;
   std::cout << "Output: " << argv[2] << std::endl;
   std::cout << "Resolution: " << resolution << std::endl;
-  std::cout << "Param. level: " << (argc > 4 ? argv[4] : "9") << std::endl;
+  std::cout << "Param. level: " << levels << std::endl;
   std::cout << "Max. entropy: " << (argc > 5 && std::string(argv[5]) == "true" ? "true" : "false")
             << std::endl;
   std::cout << "Fill corners: " << (argc > 6 && std::string(argv[6]) == "true" ? "true" : "false")
@@ -74,7 +75,7 @@ int main(int argc, char **argv) {
   if (resolution > 0)
     cgb.evaluate(resolution).writeOBJ(argv[2]);
   else
-    cgb.evaluateRegular(-resolution).writeOBJ(argv[2]);
+    cgb.evaluateRegular(levels + resolution).writeOBJ(argv[2]);
 
   return 0;
 }

@@ -2,7 +2,10 @@ include_directories(${EXTERNAL_INCLUDES} ../../dependencies/eigen)
 link_directories(${EXTERNAL_LIBRARIES})
 
 add_library(cgb SHARED
+  bezier.cc
   cgb.cc
+  curved-domain.cc
+  harmonic.cc
   lsq-plane.cc
   ${LIBTRIANGLE_OBJECT}
   )
