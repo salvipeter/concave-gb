@@ -540,8 +540,7 @@ ConcaveGB::localCoordinates(const Point2D &uv) const {
     result.resize(n);
     mec_eval(mec_parameters_, uv.data(), &result[0]);
   } else
-    for (size_t i = 0; i < n; ++i)
-      result = parameters_->eval(uv);
+    result = parameters_->eval(uv);
   for (size_t i = 0; i < n; ++i)
     if (result[i] < EPSILON)
       ++small;
@@ -555,7 +554,7 @@ ConcaveGB::localCoordinates(const Point2D &uv) const {
     for (size_t i = 0; i < n; ++i)
       result[i] /= sum;
   }
-  if (small == n - 2) {         // TODO: this is not correct when concave_weight_ != 1.0
+  if (domain_type_ != DomainType::CURVED && small == n - 2 && concave_weight_ == 1.0) {
     size_t i = 0;
     while (result[++i] < EPSILON);
     if (i == 1 && result[0] >= EPSILON)
@@ -797,7 +796,7 @@ ConcaveGB::evaluateImpl() const {
 
   {
     auto scale = [](Point2D p) {
-      return (p + Point2D(1,1)) * 250 + Point2D(50,50);
+      return p * 500 + Point2D(50,50);
     };
     std::ofstream f("deficiency.eps");
     f << "newpath\n";
