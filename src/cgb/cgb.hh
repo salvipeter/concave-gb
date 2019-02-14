@@ -46,7 +46,7 @@ public:
   void setDomainType(DomainType type);
 
   // The given tolerance controls the minimum distance between non-adjacent segments.
-  // Note that the domain is always normalized to the [-1,1]x[-1,1] square.
+  // Note that the domain is always normalized to the [0,1]x[0,1] square.
   void setDomainTolerance(double tolerance);
 
   // Alternative parameterization - positive values result in smaller weight deficiency.
@@ -100,7 +100,7 @@ public:
   // If the resolution did not change since the last call,
   // cached parameters and mesh topology are used.
   // Resolution gives the maximal area of a triangle in the domain.
-  // Since the domain is always in [-1,1]x[-1,1], usual values range betwen 1e-5 and 1e-3.
+  // Since the domain is always in [0,1]x[0,1], usual values range betwen 1e-5 and 1e-3.
   TriMesh evaluate(double resolution) const;
 
   // Same as evaluate(), but a bitmap-based triangulation is used,

@@ -195,7 +195,7 @@ namespace {
       angle = flip(flip(angle) * angle_multiplier);
   }
 
-  // Rescale to [-1,-1]x[1,1].
+  // Rescale to [0,1]x[0,1].
   void
   rescaleDomain(Point2DVector &domain) {
     double minx = 0.0, miny = 0.0, maxx = 0.0, maxy = 0.0;
@@ -204,12 +204,12 @@ namespace {
       maxx = std::max(maxx, v[0]); maxy = std::max(maxy, v[1]);
     }
     double width = std::max(maxx - minx, maxy - miny);
-    Point2D topleft(-1.0, -1.0), minp(minx, miny);
+    Point2D minp(minx, miny);
     for (auto &v : domain)
-      v = topleft + (v - minp) * 2.0 / width;
+      v = (v - minp) / width;
   }
 
-  // Generates a domain in [-1,1]x[-1,1], but does not check for validity.
+  // Generates a domain in [0,1]x[0,1], but does not check for validity.
   Point2DVector
   generateAngleLengthDomain(const DoubleVector &angles, const DoubleVector &lengths) {
     size_t n = angles.size();
@@ -423,7 +423,7 @@ ConcaveGB::generateDomain() {
 
   {
     auto scale = [](Point2D p) {
-      return (p + Point2D(1,1)) * 250 + Point2D(50,50);
+      return p * 500 + Point2D(50,50);
     };
     std::ofstream f("domain.eps");
     f << "newpath\n";
@@ -652,12 +652,12 @@ namespace {
   }
 
   // Generates a mesh using a discretization of the domain (using a bitmap of size 2^size).
-  // Assumes that domain is in [-1,1]x[-1,1].
+  // Assumes that domain is in [0,1]x[0,1].
   TriMesh regularMesh(const Point2DVector &domain, size_t size) {
-    size_t n = (size_t)std::pow(2, size);
+    size_t n = 1 << size;
     std::vector<bool> grid(n * n, false);
-    Point2D offset(-1.05, -1.05);
-    double scaling = n / 2.1;
+    Point2D offset(0.05, 0.05);
+    double scaling = n / 1.1;
 
     // Init
     Point2D p0 = (domain.back() - offset) * scaling;
