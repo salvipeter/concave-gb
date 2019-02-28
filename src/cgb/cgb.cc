@@ -203,10 +203,11 @@ namespace {
       minx = std::min(minx, v[0]); miny = std::min(miny, v[1]);
       maxx = std::max(maxx, v[0]); maxy = std::max(maxy, v[1]);
     }
+    double margin = 0.05;
     double width = std::max(maxx - minx, maxy - miny);
     Point2D minp(minx, miny);
     for (auto &v : domain)
-      v = (v - minp) / width;
+      v = Point2D(margin, margin) + (v - minp) / width / (1.0 + 2.0 * margin);
   }
 
   // Generates a domain in [0,1]x[0,1], but does not check for validity.
