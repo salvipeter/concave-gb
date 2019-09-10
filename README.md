@@ -8,8 +8,8 @@ The program was tested under Linux and Windows.
 
 You will need the following libraries:
 
-- libgeom, which is part of the [transfinite](https://bitbucket.org/salvipeter/transfinite) library
-- [libmec](https://bitbucket.org/salvipeter/libmec)
+- libgeom, which is part of the [transfinite](https://github.com/salvipeter/transfinite) library
+- [libmec](https://github.com/salvipeter/libmec)
 - Shewchuk's [Triangle](http://www.cs.cmu.edu/%7Equake/triangle.html)
 - [Eigen](https://eigen.tuxfamily.org/)
 
